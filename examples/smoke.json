@@ -1,0 +1,35 @@
+{
+  "format": "p5maker",
+  "version": 1,
+  "title": "Runtime 冒煙測試",
+  "settings": { "width": 1280, "height": 720, "fps": 30, "duration": 8, "background": "#101018" },
+  "assets": {},
+  "camera": { "props": {}, "keys": { "zoom": [{ "t": 0, "v": 1, "e": "easeInOut" }, { "t": 8, "v": 1.15 }] } },
+  "tracks": [
+    { "id": "t_fx", "name": "特效", "kind": "visual", "clips": [
+      { "id": "c_vig", "type": "fx_vignette", "start": 0, "duration": 8, "props": {} },
+      { "id": "c_tr", "type": "tr_wipe", "start": 3.6, "duration": 0.8, "props": {} }
+    ] },
+    { "id": "t_text", "name": "文字", "kind": "visual", "clips": [
+      { "id": "c_title", "type": "text", "start": 0.3, "duration": 7.5, "props": { "text": "中秋快樂", "size": 110, "y": 300, "glow": 18 },
+        "anim": { "in": { "type": "stamp", "dur": 1.2 }, "out": { "type": "fade" }, "loop": { "type": "none" } } }
+    ] },
+    { "id": "t_obj", "name": "物件", "kind": "visual", "clips": [
+      { "id": "c_box", "type": "shape3d", "start": 0, "duration": 8, "props": { "x": 1020, "y": 480, "size": 160, "kind": "torus", "material": "specular" } },
+      { "id": "c_shape", "type": "shape", "start": 0, "duration": 8, "props": { "x": 260, "y": 480 }, "anim": { "in": { "type": "pop" }, "loop": { "type": "float" } } },
+      { "id": "c_code", "type": "code", "start": 0, "duration": 8, "props": { "x": 640, "y": 520, "scale": 0.6 } }
+    ] },
+    { "id": "t_part", "name": "粒子", "kind": "visual", "clips": [
+      { "id": "c_lant", "type": "particles", "start": 0, "duration": 8, "props": { "preset": "lanterns", "count": 24, "size": 26, "color": "#ffb84d", "color2": "#ff7a2f" } },
+      { "id": "c_fw", "type": "particles", "start": 2, "duration": 6, "props": { "preset": "fireworks", "count": 240, "size": 4 } }
+    ] },
+    { "id": "t_bg", "name": "背景", "kind": "visual", "followCamera": false, "clips": [
+      { "id": "c_sky", "type": "gen", "start": 0, "duration": 8, "props": { "preset": "gradientSky" } },
+      { "id": "c_moon", "type": "gen", "start": 0, "duration": 8, "props": { "preset": "moon", "color": "#fff4d6", "color2": "#ffd27a", "w": 400, "h": 400, "x": 980, "y": 180 } }
+    ] },
+    { "id": "t_audio", "name": "音訊", "kind": "audio", "clips": [
+      { "id": "c_music", "type": "music", "start": 0, "duration": 8, "props": { "preset": "festive" } },
+      { "id": "c_pop", "type": "sfx", "start": 2, "duration": 3, "props": { "voice": "crackle" } }
+    ] }
+  ]
+}

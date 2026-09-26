@@ -1,0 +1,19 @@
+{
+  "p5": "https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js",
+  "runtime": [
+    "core.js",
+    "presets.js",
+    "assets.js",
+    "types-basic.js",
+    "types-particles.js",
+    "types-gen.js",
+    "types-3d.js",
+    "types-effects.js",
+    "audio-voices.js",
+    "audio.js",
+    "renderer.js",
+    "recorder.js"
+  ],
+  "player": "player.js",
+  "template": "player-template.html"
+}

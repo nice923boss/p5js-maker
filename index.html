@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>P5JS Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="css/editor.css">
+<script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script>
+<!-- runtime: same files and order as runtime/manifest.json -->
+<script src="runtime/core.js"></script>
+<script src="runtime/presets.js"></script>
+<script src="runtime/assets.js"></script>
+<script src="runtime/types-basic.js"></script>
+<script src="runtime/types-particles.js"></script>
+<script src="runtime/types-gen.js"></script>
+<script src="runtime/types-3d.js"></script>
+<script src="runtime/types-effects.js"></script>
+<script src="runtime/audio-voices.js"></script>
+<script src="runtime/audio.js"></script>
+<script src="runtime/renderer.js"></script>
+<script src="runtime/recorder.js"></script>
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark"></span>P5JS Maker</div>
+  <div class="tb-group">
+    <button class="tb-btn" data-cmd="new" title="新增專案"><i data-icon="filePlus"></i><span>新增</span></button>
+    <button class="tb-btn" data-cmd="open" title="開啟專案（.json 或匯出的 .html）"><i data-icon="folder"></i><span>開啟</span></button>
+    <button class="tb-btn" data-cmd="save" title="儲存（Ctrl+S）"><i data-icon="save"></i><span>儲存</span></button>
+  </div>
+  <div class="tb-group">
+    <button class="tb-icon" data-cmd="undo" title="復原（Ctrl+Z）"><i data-icon="undo"></i></button>
+    <button class="tb-icon" data-cmd="redo" title="重做（Ctrl+Y）"><i data-icon="redo"></i></button>
+  </div>
+  <div class="tb-title"><input id="project-title" type="text" placeholder="未命名專案" spellcheck="false" aria-label="專案名稱"><span id="dirty-dot" title="有未儲存的變更"></span></div>
+  <div class="tb-group right">
+    <button class="tb-btn" data-cmd="exportHtml" title="匯出成單一 HTML 播放檔"><i data-icon="code"></i><span>匯出 HTML</span></button>
+    <button class="tb-btn primary" data-cmd="exportVideo" title="錄製成影片檔"><i data-icon="film"></i><span>匯出影片</span></button>
+  </div>
+</header>
+
+<main class="workspace">
+  <aside class="library" id="library"></aside>
+  <section class="center">
+    <div class="stage-wrap" id="stage-wrap">
+      <div class="stage-frame" id="stage-frame"></div>
+    </div>
+    <div class="transport" id="transport"></div>
+  </section>
+  <aside class="inspector" id="inspector"></aside>
+</main>
+
+<div class="splitter" id="splitter" title="拖曳調整時間軸高度"></div>
+<section class="timeline" id="timeline"></section>
+
+<footer class="footer">
+  <span id="status">載入中…</span>
+  <span class="credit">製作者：黃政文</span>
+</footer>
+</body>
+</html>

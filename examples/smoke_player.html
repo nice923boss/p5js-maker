@@ -1,0 +1,2690 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="generator" content="P5JS Maker">
+<title>Runtime 冒煙測試</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  #p5m-stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  /* p5 writes inline px sizes; override so the canvas always letterboxes into the window */
+  #p5m-stage canvas { display: block; width: 100% !important; height: 100% !important; object-fit: contain; }
+  #p5m-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.28); cursor: pointer; border: 0; color: #fff; font: inherit; }
+  #p5m-overlay[hidden] { display: none; }
+  #p5m-overlay span { display: inline-flex; align-items: center; gap: 12px; padding: 16px 30px; border-radius: 999px; background: rgba(20,20,28,.72); font-size: 22px; letter-spacing: 1px; }
+  #p5m-overlay span::before { content: "▶"; font-size: 20px; }
+  #p5m-bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: linear-gradient(transparent, rgba(0,0,0,.7)); color: #eee; transition: opacity .3s; }
+  #p5m-bar button { background: none; border: 0; color: #fff; font-size: 16px; cursor: pointer; padding: 6px 8px; border-radius: 6px; font-family: inherit; }
+  #p5m-bar button:hover { background: rgba(255,255,255,.14); }
+  #p5m-seek { flex: 1; accent-color: #2dd4bf; min-width: 60px; }
+  #p5m-time { font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
+  #p5m-status { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); padding: 8px 16px; border-radius: 8px; background: rgba(20,20,28,.85); color: #fff; font-size: 14px; }
+  #p5m-status[hidden] { display: none; }
+  body.p5m-idle #p5m-bar { opacity: 0; }
+  body.p5m-idle { cursor: none; }
+  body.p5m-exporting #p5m-bar, body.p5m-exporting #p5m-overlay, body.p5m-frozen #p5m-bar, body.p5m-frozen #p5m-overlay, body.p5m-frozen #p5m-status { display: none; }
+  @media (max-width: 520px) { #p5m-bar { gap: 6px; padding: 8px 10px; } #p5m-time { display: none; } }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script>
+<script>
+// P5M core: math, easing, colors, seeded random/noise, keyframes, clip timing and the type registry.
+// Shared by the editor and the exported player. Classic script; everything hangs off window.P5M.
+(function () {
+  const P5M = (window.P5M = window.P5M || {});
+
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const lerp = (a, b, p) => a + (b - a) * p;
+  const seg = (t, a, b) => (b <= a ? (t >= b ? 1 : 0) : clamp((t - a) / (b - a), 0, 1));
+  const rad = (deg) => (deg * Math.PI) / 180;
+
+  // ---------- easing ----------
+  const backOut = (p) => { const c = 1.70158; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); };
+  const bounceOut = (p) => {
+    const n = 7.5625, d = 2.75;
+    if (p < 1 / d) return n * p * p;
+    if (p < 2 / d) return n * (p -= 1.5 / d) * p + 0.75;
+    if (p < 2.5 / d) return n * (p -= 2.25 / d) * p + 0.9375;
+    return n * (p -= 2.625 / d) * p + 0.984375;
+  };
+  const EASE = {
+    linear: (p) => p,
+    easeIn: (p) => p * p * p,
+    easeOut: (p) => 1 - Math.pow(1 - p, 3),
+    easeInOut: (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2),
+    sine: (p) => -(Math.cos(Math.PI * p) - 1) / 2,
+    backOut,
+    backIn: (p) => 1 - backOut(1 - p),
+    elastic: (p) => (p <= 0 ? 0 : p >= 1 ? 1 : Math.pow(2, -10 * p) * Math.sin((p * 10 - 0.75) * ((2 * Math.PI) / 3)) + 1),
+    bounce: bounceOut,
+    hold: (p) => (p >= 1 ? 1 : 0),
+  };
+  const EASE_LABELS = {
+    linear: '線性', easeIn: '漸快', easeOut: '漸慢', easeInOut: '慢快慢', sine: '柔和',
+    backOut: '回彈', backIn: '蓄力', elastic: '彈簧', bounce: '落地彈跳', hold: '瞬間切換',
+  };
+  const ease = (name, p) => (EASE[name] || EASE.easeInOut)(clamp(p, 0, 1));
+
+  // ---------- colors ----------
+  const colorCache = new Map();
+  function parseColor(c) {
+    if (Array.isArray(c)) return [c[0], c[1], c[2], c[3] === undefined ? 1 : c[3]];
+    const key = String(c || '#000000');
+    const hit = colorCache.get(key);
+    if (hit) return hit;
+    let out = [0, 0, 0, 1];
+    const s = key.trim();
+    if (s[0] === '#') {
+      const h = s.length === 4 || s.length === 5 ? [...s.slice(1)].map((x) => x + x).join('') : s.slice(1);
+      out = [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16),
+        h.length >= 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1];
+    } else {
+      const m = s.match(/rgba?\(([^)]+)\)/i);
+      if (m) {
+        const v = m[1].split(',').map((x) => parseFloat(x));
+        out = [v[0], v[1], v[2], v[3] === undefined ? 1 : v[3]];
+      }
+    }
+    colorCache.set(key, out);
+    return out;
+  }
+  const rgba = (c, alphaMul = 1) => {
+    const [r, g, b, a] = parseColor(c);
+    return `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${+(a * alphaMul).toFixed(4)})`;
+  };
+  const hex2 = (v) => Math.round(clamp(v, 0, 255)).toString(16).padStart(2, '0');
+  function toHex(c) {
+    const [r, g, b, a] = parseColor(c);
+    return '#' + hex2(r) + hex2(g) + hex2(b) + (a < 1 ? hex2(a * 255) : '');
+  }
+  function mixColor(a, b, p) {
+    const x = parseColor(a), y = parseColor(b);
+    return toHex([lerp(x[0], y[0], p), lerp(x[1], y[1], p), lerp(x[2], y[2], p), lerp(x[3], y[3], p)]);
+  }
+  const isColor = (v) => typeof v === 'string' && (v[0] === '#' || v.startsWith('rgb'));
+
+  // ---------- seeded random and noise ----------
+  // Stateless hash: same (n, seed) always gives the same number in [0, 1)
+  function hash(n, seed = 0) {
+    let x = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul((seed | 0) + 0x632be5ab, 0xc2b2ae35);
+    x ^= x >>> 16; x = Math.imul(x, 0x7feb352d);
+    x ^= x >>> 15; x = Math.imul(x, 0x846ca68b);
+    x ^= x >>> 16;
+    return (x >>> 0) / 4294967296;
+  }
+  // Sequential generator for setup-time lists (mulberry32)
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  // 3D gradient noise in [0, 1], seeded, independent of p5's global noiseSeed
+  const permCache = new Map();
+  function perm(seed) {
+    let p = permCache.get(seed);
+    if (p) return p;
+    const r = rng(seed * 7919 + 17);
+    const base = [...Array(256).keys()];
+    for (let i = 255; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [base[i], base[j]] = [base[j], base[i]]; }
+    p = new Uint8Array(512);
+    for (let i = 0; i < 512; i++) p[i] = base[i & 255];
+    permCache.set(seed, p);
+    return p;
+  }
+  const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+  function grad(h, x, y, z) {
+    const u = h < 8 ? x : y, v = h < 4 ? y : h === 12 || h === 14 ? x : z;
+    return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
+  }
+  function noise(x, y = 0, z = 0, seed = 0) {
+    const p = perm(seed);
+    const X = Math.floor(x) & 255, Y = Math.floor(y) & 255, Z = Math.floor(z) & 255;
+    x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z);
+    const u = fade(x), v = fade(y), w = fade(z);
+    const A = p[X] + Y, AA = p[A] + Z, AB = p[A + 1] + Z, B = p[X + 1] + Y, BA = p[B] + Z, BB = p[B + 1] + Z;
+    const n = lerp(
+      lerp(lerp(grad(p[AA] & 15, x, y, z), grad(p[BA] & 15, x - 1, y, z), u),
+        lerp(grad(p[AB] & 15, x, y - 1, z), grad(p[BB] & 15, x - 1, y - 1, z), u), v),
+      lerp(lerp(grad(p[AA + 1] & 15, x, y, z - 1), grad(p[BA + 1] & 15, x - 1, y, z - 1), u),
+        lerp(grad(p[AB + 1] & 15, x, y - 1, z - 1), grad(p[BB + 1] & 15, x - 1, y - 1, z - 1), u), v), w);
+    return clamp(n * 0.5 + 0.5, 0, 1);
+  }
+
+  // ---------- keyframes ----------
+  // keys: [{ t, v, e }] sorted by t (clip-local seconds); e = easing from this key to the next
+  function mixValue(a, b, p) {
+    if (typeof a === 'number' && typeof b === 'number') return lerp(a, b, p);
+    if (isColor(a) && isColor(b)) return mixColor(a, b, p);
+    return p < 1 ? a : b;
+  }
+  function sampleKeys(keys, t) {
+    if (t <= keys[0].t) return keys[0].v;
+    const last = keys[keys.length - 1];
+    if (t >= last.t) return last.v;
+    let i = 0;
+    while (i < keys.length - 2 && keys[i + 1].t <= t) i++;
+    const a = keys[i], b = keys[i + 1];
+    return mixValue(a.v, b.v, ease(a.e, seg(t, a.t, b.t)));
+  }
+
+  // ---------- type registry ----------
+  // def = { label, category, icon, screen?, audio?, props: [{ key, label, type, default, ... }], draw, bounds }
+  const types = {};
+  const COMMON_VISUAL = [
+    { key: 'x', label: 'X', type: 'number', step: 1, group: 'transform', anim: true },
+    { key: 'y', label: 'Y', type: 'number', step: 1, group: 'transform', anim: true },
+    { key: 'scale', label: '縮放', type: 'number', step: 0.01, min: 0, default: 1, group: 'transform', anim: true },
+    { key: 'rotation', label: '旋轉', type: 'number', step: 1, default: 0, unit: '°', group: 'transform', anim: true },
+    { key: 'opacity', label: '不透明度', type: 'range', min: 0, max: 1, step: 0.01, default: 1, group: 'transform', anim: true },
+  ];
+  const FILTER_PROPS = [
+    { key: 'blur', label: '模糊', type: 'range', min: 0, max: 40, step: 0.5, default: 0, group: 'filter', anim: true },
+    { key: 'brightness', label: '亮度', type: 'range', min: 0, max: 3, step: 0.01, default: 1, group: 'filter', anim: true },
+    { key: 'contrast', label: '對比', type: 'range', min: 0, max: 3, step: 0.01, default: 1, group: 'filter', anim: true },
+    { key: 'saturate', label: '飽和度', type: 'range', min: 0, max: 3, step: 0.01, default: 1, group: 'filter', anim: true },
+    { key: 'hue', label: '色相', type: 'range', min: -180, max: 180, step: 1, default: 0, unit: '°', group: 'filter', anim: true },
+  ];
+  function registerType(name, def) {
+    const props = def.screen || def.audio ? def.props || [] : [...COMMON_VISUAL, ...(def.props || []), ...FILTER_PROPS];
+    types[name] = { name, ...def, props };
+  }
+  function defaultProps(type, settings) {
+    const def = types[type];
+    const out = {};
+    for (const pd of def.props) {
+      if (pd.key === 'x') out.x = settings.width / 2;
+      else if (pd.key === 'y') out.y = settings.height / 2;
+      else if (pd.default !== undefined) out[pd.key] = typeof pd.default === 'function' ? pd.default(settings) : pd.default;
+    }
+    return out;
+  }
+
+  // ---------- clip timing ----------
+  const clipEnd = (c) => c.start + c.duration;
+  const isActive = (c, t) => t >= c.start && t < c.start + c.duration;
+  const localTime = (c, t) => t - c.start + (c.offset || 0);
+
+  // Resolved props at clip-local time lt: defaults <- props <- keyframes
+  function resolveProps(clip, lt, settings) {
+    const def = types[clip.type];
+    const out = {};
+    if (def) for (const pd of def.props) if (pd.default !== undefined) out[pd.key] = typeof pd.default === 'function' ? pd.default(settings) : pd.default;
+    if (def && !def.screen && !def.audio) { out.x = settings.width / 2; out.y = settings.height / 2; }
+    Object.assign(out, clip.props);
+    if (clip.keys) for (const k in clip.keys) if (clip.keys[k] && clip.keys[k].length) out[k] = sampleKeys(clip.keys[k], lt);
+    return out;
+  }
+
+  const fmtTime = (s) => {
+    const neg = s < 0; s = Math.abs(s);
+    const m = Math.floor(s / 60), sec = s - m * 60;
+    return (neg ? '-' : '') + String(m).padStart(2, '0') + ':' + sec.toFixed(2).padStart(5, '0');
+  };
+  const uid = (prefix = 'id') => prefix + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
+
+  Object.assign(P5M, {
+    VERSION: 1, clamp, lerp, seg, rad, EASE, EASE_LABELS, ease,
+    parseColor, rgba, toHex, mixColor, isColor, hash, rng, noise,
+    mixValue, sampleKeys, types, registerType, defaultProps,
+    clipEnd, isActive, localTime, resolveProps, fmtTime, uid,
+  });
+})();
+
+</script>
+<script>
+// In / out / loop animation presets (CapCut-style one-click animations).
+// clip.anim = { in: { type, dur }, out: { type, dur }, loop: { type, speed, amount } }
+// animState() returns the offsets the renderer applies on top of the (keyframed) props.
+(function () {
+  const P5M = window.P5M;
+  const { ease, seg, hash, noise, clamp } = P5M;
+
+  // Per-glyph stagger: glyph i of n animates inside its own window of progress p
+  function glyphP(p, i, n, width = 0.45) {
+    const start = n > 1 ? ((1 - width) * i) / (n - 1) : 0;
+    return seg(p, start, start + width);
+  }
+
+  // Each entry: label, dur (default seconds), text (text-only), apply(state, p, env)
+  // p runs 0 -> 1 for "in" (0 = hidden, 1 = settled); "out" presets get p 0 -> 1 as the clip leaves.
+  const IN = {
+    none: { label: '無', apply() {} },
+    fade: { label: '淡入', dur: 0.6, apply: (s, p) => { s.alpha *= ease('easeOut', p); } },
+    slideLeft: { label: '左側滑入', dur: 0.7, apply: (s, p, e) => { const q = ease('easeOut', p); s.dx -= (1 - q) * e.W * 0.25; s.alpha *= Math.min(1, p * 2); } },
+    slideRight: { label: '右側滑入', dur: 0.7, apply: (s, p, e) => { const q = ease('easeOut', p); s.dx += (1 - q) * e.W * 0.25; s.alpha *= Math.min(1, p * 2); } },
+    slideUp: { label: '下方升起', dur: 0.7, apply: (s, p, e) => { const q = ease('easeOut', p); s.dy += (1 - q) * e.H * 0.25; s.alpha *= Math.min(1, p * 2); } },
+    slideDown: { label: '上方落下', dur: 0.7, apply: (s, p, e) => { const q = ease('easeOut', p); s.dy -= (1 - q) * e.H * 0.25; s.alpha *= Math.min(1, p * 2); } },
+    zoomIn: { label: '放大出現', dur: 0.6, apply: (s, p) => { const q = ease('easeOut', p); s.sx *= q; s.sy *= q; s.alpha *= Math.min(1, p * 3); } },
+    zoomOut: { label: '縮小出現', dur: 0.7, apply: (s, p) => { const k = 1 + (1 - ease('easeOut', p)) * 0.8; s.sx *= k; s.sy *= k; s.alpha *= ease('easeOut', p); } },
+    pop: { label: '彈出', dur: 0.6, apply: (s, p) => { const q = p <= 0 ? 0 : ease('backOut', p); s.sx *= q; s.sy *= q; } },
+    drop: { label: '掉落彈跳', dur: 0.9, apply: (s, p, e) => { s.dy -= (1 - ease('bounce', p)) * e.H * 0.4; s.alpha *= Math.min(1, p * 4); } },
+    spin: { label: '旋轉出現', dur: 0.8, apply: (s, p) => { const q = ease('easeOut', p); s.rot -= (1 - q) * 270; s.sx *= q; s.sy *= q; } },
+    flip: { label: '翻轉', dur: 0.6, apply: (s, p) => { s.sx *= Math.sin(ease('easeOut', p) * Math.PI / 2); } },
+    blur: { label: '模糊淡入', dur: 0.8, apply: (s, p) => { const q = ease('easeOut', p); s.blur += (1 - q) * 24; s.alpha *= q; } },
+    wipe: { label: '擦除展開', dur: 0.8, apply: (s, p) => { s.reveal = { dir: 'right', p: ease('easeInOut', p) }; } },
+    iris: { label: '圓形展開', dur: 0.8, apply: (s, p) => { s.reveal = { dir: 'iris', p: ease('easeInOut', p) }; } },
+    typewriter: { label: '打字機', dur: 1.2, text: true, apply: (s, p) => { s.glyphs.push((g, i, n) => { if (glyphP(p, i, n, 0.02) <= 0) g.alpha = 0; }); } },
+    stamp: { label: '逐字蓋章', dur: 1.4, text: true, apply: (s, p) => {
+      s.glyphs.push((g, i, n) => { const q = glyphP(p, i, n, 0.35); g.s *= 1 + (1 - ease('easeOut', q)) * 0.6; g.alpha *= Math.min(1, q * 2.5); });
+    } },
+    rise: { label: '逐字升起', dur: 1.2, text: true, apply: (s, p) => {
+      s.glyphs.push((g, i, n) => { const q = glyphP(p, i, n, 0.5); g.dy += (1 - ease('easeOut', q)) * 48; g.alpha *= q; });
+    } },
+    bounceIn: { label: '逐字彈跳', dur: 1.2, text: true, apply: (s, p) => {
+      s.glyphs.push((g, i, n) => { const q = glyphP(p, i, n, 0.4); const k = q <= 0 ? 0 : ease('backOut', q); g.s *= k; });
+    } },
+  };
+
+  const OUT = {
+    none: { label: '無', apply() {} },
+    fade: { label: '淡出', dur: 0.6, apply: (s, p) => { s.alpha *= 1 - ease('easeIn', p); } },
+    slideLeft: { label: '向左滑出', dur: 0.7, apply: (s, p, e) => { s.dx -= ease('easeIn', p) * e.W * 0.25; s.alpha *= 1 - Math.max(0, p * 2 - 1); } },
+    slideRight: { label: '向右滑出', dur: 0.7, apply: (s, p, e) => { s.dx += ease('easeIn', p) * e.W * 0.25; s.alpha *= 1 - Math.max(0, p * 2 - 1); } },
+    slideUp: { label: '向上飄走', dur: 0.7, apply: (s, p, e) => { s.dy -= ease('easeIn', p) * e.H * 0.25; s.alpha *= 1 - Math.max(0, p * 2 - 1); } },
+    slideDown: { label: '向下落下', dur: 0.7, apply: (s, p, e) => { s.dy += ease('easeIn', p) * e.H * 0.25; s.alpha *= 1 - Math.max(0, p * 2 - 1); } },
+    zoomOut: { label: '縮小消失', dur: 0.6, apply: (s, p) => { const q = 1 - ease('easeIn', p); s.sx *= q; s.sy *= q; } },
+    zoomIn: { label: '放大消失', dur: 0.6, apply: (s, p) => { const k = 1 + ease('easeIn', p) * 0.8; s.sx *= k; s.sy *= k; s.alpha *= 1 - p; } },
+    pop: { label: '收回', dur: 0.5, apply: (s, p) => { const q = p >= 1 ? 0 : ease('backOut', 1 - p); s.sx *= q; s.sy *= q; } },
+    spin: { label: '旋轉消失', dur: 0.8, apply: (s, p) => { const q = ease('easeIn', p); s.rot += q * 270; s.sx *= 1 - q; s.sy *= 1 - q; } },
+    flip: { label: '翻轉', dur: 0.6, apply: (s, p) => { s.sx *= Math.cos(ease('easeIn', p) * Math.PI / 2); } },
+    blur: { label: '模糊淡出', dur: 0.8, apply: (s, p) => { const q = ease('easeIn', p); s.blur += q * 24; s.alpha *= 1 - q; } },
+    wipe: { label: '擦除收起', dur: 0.8, apply: (s, p) => { s.reveal = { dir: 'left', p: 1 - ease('easeInOut', p) }; } },
+    iris: { label: '圓形收合', dur: 0.8, apply: (s, p) => { s.reveal = { dir: 'iris', p: 1 - ease('easeInOut', p) }; } },
+    typewriter: { label: '倒退刪字', dur: 1, text: true, apply: (s, p) => { s.glyphs.push((g, i, n) => { if (glyphP(1 - p, i, n, 0.02) <= 0) g.alpha = 0; }); } },
+    fall: { label: '逐字掉落', dur: 1.2, text: true, apply: (s, p) => {
+      s.glyphs.push((g, i, n) => { const q = glyphP(p, i, n, 0.5); g.dy += ease('easeIn', q) * 80; g.rot += q * 30; g.alpha *= 1 - q; });
+    } },
+  };
+
+  // Loop presets run for the whole clip; t = clip content time (seconds since start + offset, so split halves stay continuous)
+  const LOOP = {
+    none: { label: '無', apply() {} },
+    float: { label: '漂浮', apply: (s, t, sp, am) => { s.dy += Math.sin(t * Math.PI * sp) * 12 * am; } },
+    pulse: { label: '呼吸', apply: (s, t, sp, am) => { const k = 1 + Math.sin(t * Math.PI * 2 * sp) * 0.05 * am; s.sx *= k; s.sy *= k; } },
+    sway: { label: '搖擺', apply: (s, t, sp, am) => { s.rot += Math.sin(t * Math.PI * sp) * 8 * am; } },
+    spin: { label: '持續旋轉', apply: (s, t, sp, am) => { s.rot += t * 90 * sp * am; } },
+    blink: { label: '閃爍', apply: (s, t, sp, am) => { s.alpha *= 1 - am * 0.5 * (1 - Math.cos(t * Math.PI * 2 * sp)) / 2 * 2; } },
+    flicker: { label: '燭光', apply: (s, t, sp, am, seed) => { s.alpha *= 1 - am * 0.35 * noise(t * 6 * sp, 0, 0, seed); } },
+    shake: { label: '抖動', apply: (s, t, sp, am, seed) => {
+      s.dx += (noise(t * 12 * sp, 1, 0, seed) - 0.5) * 16 * am; s.dy += (noise(t * 12 * sp, 7, 0, seed) - 0.5) * 16 * am;
+    } },
+    heartbeat: { label: '心跳', apply: (s, t, sp, am) => {
+      const ph = (t * sp) % 1;
+      const k = 1 + (Math.exp(-Math.pow((ph - 0.1) * 18, 2)) * 0.08 + Math.exp(-Math.pow((ph - 0.3) * 18, 2)) * 0.05) * am;
+      s.sx *= k; s.sy *= k;
+    } },
+    jelly: { label: '果凍', apply: (s, t, sp, am) => { const w = Math.sin(t * Math.PI * 2 * sp) * 0.06 * am; s.sx *= 1 + w; s.sy *= 1 - w; } },
+    wave: { label: '逐字波浪', text: true, apply: (s, t, sp, am) => {
+      s.glyphs.push((g, i) => { g.dy += Math.sin(t * Math.PI * 2 * sp - i * 0.6) * 8 * am; });
+    } },
+    glyphPulse: { label: '逐字閃亮', text: true, apply: (s, t, sp, am) => {
+      s.glyphs.push((g, i, n) => { const ph = ((t * sp * 0.8 - i / Math.max(1, n)) % 1 + 1) % 1; g.s *= 1 + Math.exp(-ph * 12) * 0.25 * am; });
+    } },
+  };
+
+  function animState(clip, t, env) {
+    const s = { dx: 0, dy: 0, sx: 1, sy: 1, rot: 0, alpha: 1, blur: 0, reveal: null, glyphs: [] };
+    const a = clip.anim;
+    if (!a) return s;
+    const since = t - clip.start;
+    const until = clip.start + clip.duration - t;
+    if (a.in && a.in.type && a.in.type !== 'none' && IN[a.in.type]) {
+      const d = Math.max(0.01, Math.min(a.in.dur ?? IN[a.in.type].dur ?? 0.6, clip.duration));
+      if (since < d) IN[a.in.type].apply(s, clamp(since / d, 0, 1), env);
+    }
+    if (a.out && a.out.type && a.out.type !== 'none' && OUT[a.out.type]) {
+      const d = Math.max(0.01, Math.min(a.out.dur ?? OUT[a.out.type].dur ?? 0.6, clip.duration));
+      if (until < d) OUT[a.out.type].apply(s, clamp(1 - until / d, 0, 1), env);
+    }
+    if (a.loop && a.loop.type && a.loop.type !== 'none' && LOOP[a.loop.type]) {
+      LOOP[a.loop.type].apply(s, since + (clip.offset || 0), a.loop.speed ?? 1, a.loop.amount ?? 1, hashSeed(clip.id));
+    }
+    return s;
+  }
+
+  const seedCache = new Map();
+  function hashSeed(id) {
+    let v = seedCache.get(id);
+    if (v === undefined) {
+      v = 0;
+      for (const ch of String(id)) v = (Math.imul(v, 31) + ch.charCodeAt(0)) | 0;
+      seedCache.set(id, (v = Math.abs(v) % 100000));
+    }
+    return v;
+  }
+
+  // Default glyph transform and composition of all active glyph effects
+  function glyphTransform(s, i, n) {
+    const g = { dx: 0, dy: 0, s: 1, rot: 0, alpha: 1 };
+    for (const f of s.glyphs) f(g, i, n);
+    return g;
+  }
+
+  P5M.presets = { IN, OUT, LOOP, glyphP, hash, hashSeed };
+  P5M.animState = animState;
+  P5M.glyphTransform = glyphTransform;
+})();
+
+</script>
+<script>
+// Asset loading: images, audio buffers, web fonts and legacy p5 projects (hidden srcdoc iframe).
+// Loads are lazy; when something finishes, P5M.assets.onReady() fires so the host can re-render.
+(function () {
+  const P5M = window.P5M;
+
+  const FONTS = [
+    { family: 'Noto Sans TC', label: '思源黑體', google: 'Noto+Sans+TC:wght@400;700;900' },
+    { family: 'Noto Serif TC', label: '思源宋體', google: 'Noto+Serif+TC:wght@400;700;900' },
+    { family: 'LXGW WenKai TC', label: '霞鶩文楷', google: 'LXGW+WenKai+TC:wght@400;700' },
+    { family: 'Microsoft JhengHei', label: '微軟正黑體（系統）' },
+    { family: 'Poppins', label: 'Poppins', google: 'Poppins:wght@400;700;900' },
+    { family: 'Playfair Display', label: 'Playfair Display', google: 'Playfair+Display:wght@400;700;900' },
+    { family: 'Pacifico', label: 'Pacifico（手寫）', google: 'Pacifico' },
+  ];
+
+  const images = new Map();
+  const audio = new Map();
+  const legacy = new Map();
+  const fontsRequested = new Set();
+  const fontsLoaded = new Set();
+  let decodeCtx = null;
+
+  const api = {
+    FONTS,
+    onReady: () => {},
+    notify() { api.onReady(); },
+
+    image(asset) {
+      if (!asset) return null;
+      let e = images.get(asset.id);
+      if (!e) {
+        const img = new Image();
+        e = { img, ready: false, error: null };
+        images.set(asset.id, e);
+        img.onload = () => { e.ready = true; api.notify(); };
+        img.onerror = () => { e.error = '圖片載入失敗：' + asset.name; console.error(e.error); api.notify(); };
+        img.src = asset.src;
+      }
+      return e.ready ? e.img : null;
+    },
+
+    audioBuffer(asset) {
+      if (!asset) return Promise.resolve(null);
+      let e = audio.get(asset.id);
+      if (!e) {
+        decodeCtx = decodeCtx || new OfflineAudioContext(2, 1, 48000);
+        e = fetch(asset.src).then((r) => r.arrayBuffer()).then((b) => decodeCtx.decodeAudioData(b))
+          .catch((err) => { console.error('音訊解碼失敗', asset.name, err); return null; });
+        audio.set(asset.id, e);
+      }
+      return e;
+    },
+
+    // Google Fonts link for the given families (only those not requested yet)
+    requestFonts(families) {
+      const need = FONTS.filter((f) => f.google && families.includes(f.family) && !fontsRequested.has(f.family));
+      if (!need.length) return;
+      need.forEach((f) => fontsRequested.add(f.family));
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?' + need.map((f) => 'family=' + f.google).join('&') + '&display=swap';
+      document.head.appendChild(link);
+    },
+
+    // Ensure glyphs of `text` in `family` are loaded; re-render once they arrive
+    font(family, weight, text) {
+      const key = family + '|' + weight + '|' + text;
+      if (fontsLoaded.has(key)) return;
+      fontsLoaded.add(key);
+      api.requestFonts([family]);
+      document.fonts.load(`${weight} 40px "${family}"`, text || 'A').then(() => api.notify()).catch(() => {});
+    },
+
+    legacy(asset) {
+      if (!asset) return null;
+      let e = legacy.get(asset.id);
+      if (!e) { e = buildLegacy(asset); legacy.set(asset.id, e); }
+      return e;
+    },
+
+    // Drop cached images, decoded audio and legacy iframes (each a full p5 page) whose asset is not in keepIds;
+    // the editor calls this when another project opens
+    release(keepIds) {
+      for (const id of [...images.keys()]) if (!keepIds.has(id)) images.delete(id);
+      for (const id of [...audio.keys()]) if (!keepIds.has(id)) audio.delete(id);
+      for (const [id, e] of legacy) if (!keepIds.has(id)) { e.frame.remove(); legacy.delete(id); }
+    },
+
+    // Wait until everything the project references is loaded (used before export and first play)
+    async prepare(project) {
+      const jobs = [];
+      const used = usedAssetIds(project);
+      for (const id of used) {
+        const a = project.assets[id];
+        if (!a) continue;
+        if (a.kind === 'image') { api.image(a); jobs.push(waitFor(() => images.get(a.id).ready || images.get(a.id).error)); }
+        if (a.kind === 'audio') jobs.push(api.audioBuffer(a));
+        if (a.kind === 'legacy') jobs.push(api.legacy(a).promise);
+      }
+      const fams = new Map();
+      for (const tr of project.tracks) for (const c of tr.clips) {
+        if (c.type === 'text') {
+          const f = c.props.font || 'Noto Sans TC';
+          fams.set(f + '|' + (c.props.weight || 700), (fams.get(f + '|' + (c.props.weight || 700)) || '') + (c.props.text || ''));
+        }
+      }
+      api.requestFonts([...fams.keys()].map((k) => k.split('|')[0]));
+      for (const [k, text] of fams) {
+        const [f, w] = k.split('|');
+        jobs.push(document.fonts.load(`${w} 40px "${f}"`, text).catch(() => {}));
+      }
+      await Promise.all(jobs);
+    },
+
+    usedAssetIds,
+  };
+
+  function usedAssetIds(project) {
+    const ids = new Set();
+    for (const tr of project.tracks) for (const c of tr.clips) for (const k of ['asset', 'texture']) if (c.props && c.props[k]) ids.add(c.props[k]);
+    return ids;
+  }
+
+  function waitFor(cond, timeout = 15000) {
+    return new Promise((resolve) => {
+      const t0 = performance.now();
+      const iv = setInterval(() => {
+        if (cond() || performance.now() - t0 > timeout) { clearInterval(iv); resolve(); }
+      }, 50);
+    });
+  }
+
+  // Legacy project = p5 global-mode sketch following the p5-comfyui-animation engine.js contract.
+  // It runs inside a same-origin srcdoc iframe; each frame we call seek(t) and copy its canvas.
+  function buildLegacy(asset) {
+    const e = { ready: false, error: null, frame: null, cw: null, canvas: null, film: null, score: null, promise: null };
+    const safe = (s) => String(s || '').replace(/<\/script/gi, '<\\/script');
+    const f = asset.files || {};
+    const boot = 'window.__p5mReady=false;const __p5mSetup=setup;' +
+      'setup=function(){__p5mSetup();noLoop();window.__p5mReady=true;};';
+    const fontLink = asset.fontHref ? `<link rel="stylesheet" href="${asset.fontHref.replace(/"/g, '&quot;')}">` : '';
+    const html = '<!doctype html><html><head><meta charset="utf-8">' + fontLink +
+      '<style>html,body{margin:0;background:#000;overflow:hidden}</style>' +
+      '<script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"><\/script>' +
+      ['assets', 'engine', 'sound', 'sketch'].map((k) => `<script>${safe(f[k])}<\/script>`).join('') +
+      `<script>${boot}<\/script></head><body><div id="stage"></div></body></html>`;
+    const fr = document.createElement('iframe');
+    fr.setAttribute('aria-hidden', 'true');
+    fr.tabIndex = -1;
+    fr.style.cssText = `position:fixed;left:-30000px;top:0;width:${asset.width || 1280}px;height:${asset.height || 720}px;border:0;pointer-events:none`;
+    fr.srcdoc = html;
+    document.body.appendChild(fr);
+    e.frame = fr;
+    e.promise = new Promise((resolve) => {
+      const t0 = performance.now();
+      const iv = setInterval(async () => {
+        if (!fr.isConnected) { clearInterval(iv); resolve(e); return; } // released before it finished loading
+        let cw = null;
+        try { cw = fr.contentWindow; } catch (err) { /* cross-origin (should not happen) */ }
+        if (cw && cw.__p5mReady) {
+          clearInterval(iv);
+          try {
+            e.cw = cw;
+            e.canvas = cw.document.querySelector('canvas');
+            e.film = cw.eval('typeof FILM !== "undefined" ? FILM : null');
+            e.score = cw.eval('typeof SCORE !== "undefined" ? SCORE : null');
+            if (e.film && e.film.fontSpec) await cw.document.fonts.load(e.film.fontSpec, e.film.fontText || '').catch(() => {});
+            e.ready = true;
+          } catch (err) {
+            e.error = '舊專案初始化失敗：' + err.message;
+            console.error(e.error, err);
+          }
+          api.notify();
+          resolve(e);
+        } else if (performance.now() - t0 > 30000) {
+          clearInterval(iv);
+          e.error = '舊專案載入逾時（30 秒）：' + asset.name;
+          console.error(e.error);
+          api.notify();
+          resolve(e);
+        }
+      }, 60);
+    });
+    return e;
+  }
+
+  // Render the legacy project at local time lt; returns its canvas or null while loading
+  api.legacyFrame = function (asset, lt) {
+    const e = api.legacy(asset);
+    if (!e.ready) return null;
+    const dur = (e.film && e.film.duration) || asset.duration || 0;
+    e.cw.seek(Math.max(0, Math.min(lt, dur)));
+    return e.canvas;
+  };
+
+  P5M.assets = api;
+})();
+
+</script>
+<script>
+// Basic visual layer types: shape, text, image, code, legacy.
+// draw(p, pr, env) paints around the local origin; the renderer already applied position, rotation, scale, opacity.
+// bounds(pr, env) returns the local box { w, h } centered on the origin (hit testing, handles, wipe reveal).
+(function () {
+  const P5M = window.P5M;
+  const { registerType, rgba, rad } = P5M;
+
+  // ---------- shape ----------
+  function shapePath(kind, w, h, pr) {
+    const path = new Path2D();
+    const hw = w / 2, hh = h / 2;
+    if (kind === 'rect') {
+      const r = Math.min(pr.radius || 0, hw, hh);
+      if (path.roundRect) path.roundRect(-hw, -hh, w, h, r); else path.rect(-hw, -hh, w, h);
+    } else if (kind === 'ellipse') {
+      path.ellipse(0, 0, hw, hh, 0, 0, Math.PI * 2);
+    } else if (kind === 'ring') {
+      const k = Math.max(0.05, Math.min(0.95, pr.inner ?? 0.7));
+      path.ellipse(0, 0, hw, hh, 0, 0, Math.PI * 2);
+      path.ellipse(0, 0, hw * k, hh * k, 0, Math.PI * 2, 0, true);
+    } else if (kind === 'arc') {
+      const sweep = rad(Math.max(0, Math.min(360, pr.sweep ?? 270)));
+      path.moveTo(0, 0);
+      path.ellipse(0, 0, hw, hh, 0, -Math.PI / 2, -Math.PI / 2 + sweep);
+      path.closePath();
+    } else if (kind === 'triangle') {
+      path.moveTo(0, -hh); path.lineTo(hw, hh); path.lineTo(-hw, hh); path.closePath();
+    } else if (kind === 'star' || kind === 'polygon') {
+      const n = Math.max(3, Math.round(kind === 'star' ? pr.points || 5 : pr.sides || 6));
+      const steps = kind === 'star' ? n * 2 : n;
+      const inner = kind === 'star' ? Math.max(0.1, Math.min(1, pr.inner ?? 0.45)) : 1;
+      for (let i = 0; i < steps; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI * 2) / steps;
+        const k = kind === 'star' && i % 2 ? inner : 1;
+        const x = Math.cos(a) * hw * k, y = Math.sin(a) * hh * k;
+        if (i) path.lineTo(x, y); else path.moveTo(x, y);
+      }
+      path.closePath();
+    } else if (kind === 'heart') {
+      path.moveTo(0, hh);
+      path.bezierCurveTo(-hw * 1.35, -hh * 0.1, -hw * 0.55, -hh * 1.25, 0, -hh * 0.45);
+      path.bezierCurveTo(hw * 0.55, -hh * 1.25, hw * 1.35, -hh * 0.1, 0, hh);
+      path.closePath();
+    } else if (kind === 'line') {
+      path.moveTo(-hw, 0); path.lineTo(hw, 0);
+    }
+    return path;
+  }
+
+  function paintFill(ctx, pr, w, h) {
+    if (pr.gradient === 'linear') {
+      const g = ctx.createLinearGradient(0, -h / 2, 0, h / 2);
+      g.addColorStop(0, rgba(pr.fill)); g.addColorStop(1, rgba(pr.fill2));
+      return g;
+    }
+    if (pr.gradient === 'radial') {
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(w, h) / 2);
+      g.addColorStop(0, rgba(pr.fill)); g.addColorStop(1, rgba(pr.fill2));
+      return g;
+    }
+    return rgba(pr.fill);
+  }
+
+  function applyGlow(ctx, pr) {
+    if (pr.glow > 0) { ctx.shadowBlur = pr.glow; ctx.shadowColor = rgba(pr.glowColor || '#ffffff'); }
+  }
+
+  registerType('shape', {
+    label: '形狀', category: 'shape',
+    props: [
+      { key: 'kind', label: '形狀', type: 'select', default: 'rect', group: 'main', options: [
+        ['rect', '矩形'], ['ellipse', '圓形'], ['triangle', '三角形'], ['star', '星形'], ['polygon', '多邊形'],
+        ['heart', '愛心'], ['ring', '圓環'], ['arc', '扇形'], ['line', '線條']] },
+      { key: 'w', label: '寬', type: 'number', min: 1, step: 1, default: 240, group: 'main', anim: true },
+      { key: 'h', label: '高', type: 'number', min: 1, step: 1, default: 240, group: 'main', anim: true },
+      { key: 'fill', label: '填色', type: 'color', default: '#ffcc4d', group: 'main', anim: true },
+      { key: 'gradient', label: '漸層', type: 'select', default: 'none', group: 'main', options: [['none', '無'], ['linear', '線性'], ['radial', '放射']] },
+      { key: 'fill2', label: '漸層色', type: 'color', default: '#ff6b6b', group: 'main', anim: true, when: (pr) => pr.gradient !== 'none' },
+      { key: 'stroke', label: '外框色', type: 'color', default: '#ffffff', group: 'main', anim: true },
+      { key: 'strokeWeight', label: '外框粗細', type: 'number', min: 0, step: 0.5, default: 0, group: 'main', anim: true },
+      { key: 'radius', label: '圓角', type: 'number', min: 0, step: 1, default: 24, group: 'main', anim: true, when: (pr) => pr.kind === 'rect' },
+      { key: 'points', label: '角數', type: 'number', min: 3, max: 24, step: 1, default: 5, group: 'main', when: (pr) => pr.kind === 'star' },
+      { key: 'sides', label: '邊數', type: 'number', min: 3, max: 24, step: 1, default: 6, group: 'main', when: (pr) => pr.kind === 'polygon' },
+      { key: 'inner', label: '內徑比例', type: 'range', min: 0.05, max: 0.95, step: 0.01, default: 0.45, group: 'main', anim: true, when: (pr) => pr.kind === 'star' || pr.kind === 'ring' },
+      { key: 'sweep', label: '角度', type: 'range', min: 0, max: 360, step: 1, default: 270, unit: '°', group: 'main', anim: true, when: (pr) => pr.kind === 'arc' },
+      { key: 'glow', label: '光暈', type: 'number', min: 0, step: 1, default: 0, group: 'main', anim: true },
+      { key: 'glowColor', label: '光暈色', type: 'color', default: '#ffffff', group: 'main', anim: true, when: (pr) => pr.glow > 0 },
+    ],
+    draw(p, pr) {
+      const ctx = p.drawingContext;
+      const path = shapePath(pr.kind, pr.w, pr.h, pr);
+      applyGlow(ctx, pr);
+      if (pr.kind === 'line') {
+        ctx.lineCap = 'round';
+        ctx.lineWidth = Math.max(1, pr.strokeWeight || 6);
+        ctx.strokeStyle = rgba(pr.strokeWeight > 0 ? pr.stroke : pr.fill);
+        ctx.stroke(path);
+        return;
+      }
+      ctx.fillStyle = paintFill(ctx, pr, pr.w, pr.h);
+      ctx.fill(path, 'evenodd');
+      if (pr.strokeWeight > 0) {
+        ctx.shadowBlur = 0;
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = pr.strokeWeight;
+        ctx.strokeStyle = rgba(pr.stroke);
+        ctx.stroke(path);
+      }
+    },
+    bounds: (pr) => ({ w: pr.w, h: pr.kind === 'line' ? Math.max(pr.strokeWeight || 6, 12) : pr.h }),
+  });
+
+  // ---------- text ----------
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  const widthCache = new Map();
+  // Widths measured before a web font arrives are fallback-font widths; drop them and repaint once it loads
+  document.fonts.addEventListener('loadingdone', () => { widthCache.clear(); P5M.assets.notify(); });
+  const fontString = (pr) => `${pr.weight || 700} ${pr.size}px "${pr.font}", "Noto Sans TC", "Microsoft JhengHei", sans-serif`;
+
+  function layoutText(pr) {
+    const font = fontString(pr);
+    measureCtx.font = font;
+    const lines = String(pr.text ?? '').split('\n').map((line) => [...line]);
+    const spacing = pr.letterSpacing || 0;
+    const lh = pr.size * (pr.lineHeight || 1.25);
+    const measured = lines.map((chars) => chars.map((ch) => {
+      const key = font + '|' + ch;
+      let w = widthCache.get(key);
+      if (w === undefined) { w = measureCtx.measureText(ch).width; widthCache.set(key, w); }
+      return w;
+    }));
+    const lineW = measured.map((ws) => ws.reduce((a, b) => a + b, 0) + Math.max(0, ws.length - 1) * spacing);
+    const maxW = Math.max(1, ...lineW);
+    const glyphs = [];
+    lines.forEach((chars, li) => {
+      let x = pr.align === 'left' ? -maxW / 2 : pr.align === 'right' ? maxW / 2 - lineW[li] : -lineW[li] / 2;
+      const y = -((lines.length - 1) * lh) / 2 + li * lh;
+      chars.forEach((ch, ci) => {
+        const w = measured[li][ci];
+        glyphs.push({ ch, x: x + w / 2, y });
+        x += w + spacing;
+      });
+    });
+    return { font, glyphs, w: maxW, h: lines.length * lh };
+  }
+
+  registerType('text', {
+    label: '文字', category: 'text',
+    props: [
+      { key: 'text', label: '內容', type: 'textarea', default: '輸入文字', group: 'main' },
+      { key: 'font', label: '字型', type: 'font', default: 'Noto Sans TC', group: 'main' },
+      { key: 'weight', label: '粗細', type: 'select', default: 700, group: 'main', options: [[400, '一般'], [700, '粗'], [900, '特粗']] },
+      { key: 'size', label: '字級', type: 'number', min: 4, step: 1, default: 72, group: 'main', anim: true },
+      { key: 'fill', label: '文字色', type: 'color', default: '#ffffff', group: 'main', anim: true },
+      { key: 'stroke', label: '描邊色', type: 'color', default: '#000000', group: 'main', anim: true },
+      { key: 'strokeWeight', label: '描邊粗細', type: 'number', min: 0, step: 0.5, default: 0, group: 'main', anim: true },
+      { key: 'align', label: '對齊', type: 'select', default: 'center', group: 'main', options: [['left', '靠左'], ['center', '置中'], ['right', '靠右']] },
+      { key: 'letterSpacing', label: '字距', type: 'number', step: 1, default: 0, group: 'main', anim: true },
+      { key: 'lineHeight', label: '行高', type: 'number', min: 0.5, step: 0.05, default: 1.3, group: 'main' },
+      { key: 'glow', label: '光暈', type: 'number', min: 0, step: 1, default: 0, group: 'main', anim: true },
+      { key: 'glowColor', label: '光暈色', type: 'color', default: '#ffd27a', group: 'main', anim: true, when: (pr) => pr.glow > 0 },
+    ],
+    draw(p, pr, env) {
+      const ctx = p.drawingContext;
+      P5M.assets.font(pr.font, pr.weight || 700, pr.text);
+      const L = layoutText(pr);
+      ctx.font = L.font;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineJoin = 'round';
+      applyGlow(ctx, pr);
+      const fill = rgba(pr.fill), stroke = rgba(pr.stroke);
+      const n = L.glyphs.length;
+      const base = ctx.globalAlpha;
+      L.glyphs.forEach((gl, i) => {
+        const g = env.st.glyphs.length ? P5M.glyphTransform(env.st, i, n) : null;
+        if (g && (g.alpha <= 0.001 || g.s === 0)) return;
+        ctx.save();
+        ctx.translate(gl.x + (g ? g.dx : 0), gl.y + (g ? g.dy : 0));
+        if (g) { if (g.rot) ctx.rotate(rad(g.rot)); if (g.s !== 1) ctx.scale(g.s, g.s); ctx.globalAlpha = base * Math.min(1, g.alpha); }
+        if (pr.strokeWeight > 0) { ctx.lineWidth = pr.strokeWeight * 2; ctx.strokeStyle = stroke; ctx.strokeText(gl.ch, 0, 0); }
+        ctx.fillStyle = fill;
+        ctx.fillText(gl.ch, 0, 0);
+        ctx.restore();
+      });
+    },
+    bounds(pr) { const L = layoutText(pr); return { w: L.w, h: L.h }; },
+  });
+
+  // ---------- image ----------
+  registerType('image', {
+    label: '圖片', category: 'media',
+    props: [
+      { key: 'asset', label: '圖片', type: 'asset', accept: 'image', group: 'main' },
+      { key: 'w', label: '寬', type: 'number', min: 1, step: 1, default: 400, group: 'main', anim: true },
+      { key: 'flipX', label: '水平翻轉', type: 'bool', default: false, group: 'main' },
+      { key: 'radius', label: '圓角', type: 'number', min: 0, step: 1, default: 0, group: 'main', anim: true },
+      { key: 'glow', label: '陰影／光暈', type: 'number', min: 0, step: 1, default: 0, group: 'main', anim: true },
+      { key: 'glowColor', label: '光暈色', type: 'color', default: '#000000aa', group: 'main', anim: true, when: (pr) => pr.glow > 0 },
+    ],
+    draw(p, pr, env) {
+      const asset = env.project.assets[pr.asset];
+      const img = P5M.assets.image(asset);
+      const b = this.bounds(pr, env);
+      const ctx = p.drawingContext;
+      if (!img) {
+        ctx.fillStyle = 'rgba(128,128,128,0.35)';
+        ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+        return;
+      }
+      if (pr.flipX) ctx.scale(-1, 1);
+      applyGlow(ctx, pr);
+      if (pr.radius > 0) {
+        const path = new Path2D();
+        if (path.roundRect) path.roundRect(-b.w / 2, -b.h / 2, b.w, b.h, pr.radius); else path.rect(-b.w / 2, -b.h / 2, b.w, b.h);
+        if (pr.glow > 0) { ctx.fillStyle = '#000'; ctx.fill(path); ctx.shadowBlur = 0; }
+        ctx.clip(path);
+      }
+      ctx.drawImage(img, -b.w / 2, -b.h / 2, b.w, b.h);
+    },
+    bounds(pr, env) {
+      const a = env && env.project.assets[pr.asset];
+      const img = a && !a.w ? P5M.assets.image(a) : null; // hand-written assets may lack w / h
+      const ratio = a && a.w ? a.h / a.w : img ? img.naturalHeight / img.naturalWidth : 0.75;
+      return { w: pr.w, h: pr.w * ratio };
+    },
+  });
+
+  // ---------- code (escape hatch: raw p5 drawing) ----------
+  const DEFAULT_CODE = [
+    '// p = p5 instance, t = seconds since this clip started, env.W / env.H = canvas size',
+    '// Draw around (0, 0). Position, scale and in/out animations come from the clip.',
+    'p.noFill();',
+    'p.strokeWeight(4);',
+    'for (let i = 0; i < 10; i++) {',
+    '  p.stroke(255, 180 + i * 7, 80, 220 - i * 18);',
+    '  const r = 40 + i * 16 + Math.sin(t * 2 + i * 0.6) * 10;',
+    '  p.circle(0, 0, r * 2);',
+    '}',
+  ].join('\n');
+  const compiled = new Map();
+  function compile(code) {
+    let e = compiled.get(code);
+    if (!e) {
+      try { e = { fn: new Function('p', 't', 'env', 'P5M', code), error: null }; } catch (err) { e = { fn: null, error: err.message }; }
+      compiled.set(code, e);
+    }
+    return e;
+  }
+  function drawError(ctx, w, h, msg) {
+    ctx.fillStyle = 'rgba(180,30,40,0.55)';
+    ctx.fillRect(-w / 2, -h / 2, w, h);
+    ctx.fillStyle = '#fff';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('程式碼錯誤：' + String(msg).slice(0, 60), 0, 0);
+  }
+
+  registerType('code', {
+    label: '程式碼', category: 'code',
+    props: [
+      { key: 'code', label: 'p5 程式碼', type: 'code', default: DEFAULT_CODE, group: 'main' },
+      { key: 'w', label: '範圍寬', type: 'number', min: 1, step: 1, default: 400, group: 'main' },
+      { key: 'h', label: '範圍高', type: 'number', min: 1, step: 1, default: 400, group: 'main' },
+    ],
+    draw(p, pr, env) {
+      const c = compile(pr.code || '');
+      if (c.error) { drawError(p.drawingContext, pr.w, pr.h, c.error); return; }
+      p.push();
+      try { c.fn(p, env.lt, env, P5M); } catch (err) {
+        if (!c.warned) { console.error('程式碼 clip 執行錯誤', err); c.warned = true; }
+        p.pop(); p.push();
+        drawError(p.drawingContext, pr.w, pr.h, err.message);
+      }
+      p.pop();
+    },
+    bounds: (pr) => ({ w: pr.w, h: pr.h }),
+  });
+
+  // ---------- legacy p5-comfyui-animation project (whole clip) ----------
+  registerType('legacy', {
+    label: '舊版動畫', category: 'media',
+    props: [{ key: 'asset', label: '來源', type: 'asset', accept: 'legacy', group: 'main' }],
+    draw(p, pr, env) {
+      const asset = env.project.assets[pr.asset];
+      const b = this.bounds(pr, env);
+      const ctx = p.drawingContext;
+      const cv = asset ? P5M.assets.legacyFrame(asset, env.lt) : null;
+      if (cv) { ctx.drawImage(cv, -b.w / 2, -b.h / 2, b.w, b.h); return; }
+      const e = asset && P5M.assets.legacy(asset);
+      ctx.fillStyle = '#1d1a2b';
+      ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+      ctx.fillStyle = e && e.error ? '#ff8a8a' : '#b9b3d6';
+      ctx.font = '28px "Noto Sans TC", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(e && e.error ? e.error : '舊版動畫載入中…', 0, 0);
+    },
+    bounds(pr, env) {
+      const a = env && env.project.assets[pr.asset];
+      return { w: (a && a.width) || 1280, h: (a && a.height) || 720 };
+    },
+  });
+
+  P5M.shapePath = shapePath;
+  P5M.layoutText = layoutText;
+})();
+
+</script>
+<script>
+// Particle and weather layers. Stateless: every particle position is a pure function of (index, seed, time),
+// so scrubbing, seeking and export all give identical frames without simulation state.
+(function () {
+  const P5M = window.P5M;
+  const { registerType, hash, noise, rgba, parseColor, mixColor } = P5M;
+  const TAU = Math.PI * 2;
+
+  // Cached soft round sprite per color (radial gradient), drawn with drawImage for speed
+  const spriteCache = new Map();
+  function softDot(color) {
+    let c = spriteCache.get(color);
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = c.height = 64;
+    // CPU-backed on purpose: GPU-backed sprites were measured at ~7 ms per drawImage once Chrome's canvas
+    // state degraded (300-particle fireworks frame took 1.7 s); CPU sprites stayed ~0.002 ms per draw
+    const g = c.getContext('2d', { willReadFrequently: true });
+    const [r, gg, b] = parseColor(color);
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, `rgba(${r},${gg},${b},1)`);
+    grad.addColorStop(0.35, `rgba(${r},${gg},${b},0.55)`);
+    grad.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    spriteCache.set(color, c);
+    return c;
+  }
+  function sprite(ctx, color, x, y, d, alpha) {
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(softDot(color), x - d / 2, y - d / 2, d, d);
+  }
+  function petal(ctx, x, y, s, rot, flip) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(1, flip);
+    ctx.beginPath();
+    ctx.moveTo(0, -s);
+    ctx.bezierCurveTo(s * 0.9, -s * 0.6, s * 0.7, s * 0.6, 0, s);
+    ctx.bezierCurveTo(-s * 0.7, s * 0.6, -s * 0.9, -s * 0.6, 0, -s);
+    ctx.fill();
+    ctx.restore();
+  }
+  function heart(ctx, x, y, s) {
+    ctx.beginPath();
+    ctx.moveTo(x, y + s * 0.9);
+    ctx.bezierCurveTo(x - s * 1.4, y, x - s * 0.6, y - s * 1.1, x, y - s * 0.35);
+    ctx.bezierCurveTo(x + s * 0.6, y - s * 1.1, x + s * 1.4, y, x, y + s * 0.9);
+    ctx.fill();
+  }
+
+  // motion: fall / rise (wrap vertically), drift (wrap horizontally), wander (noise), static, burst (fireworks)
+  const PRESETS = {
+    snow: { label: '雪花', motion: 'fall', vy: 60, sway: 18, d: { count: 180, size: 7, speed: 1, wind: 0.3, color: '#ffffff', color2: '#d6e9ff' },
+      draw: (ctx, q, pr) => sprite(ctx, q.color, q.x, q.y, q.s * 2.2, q.a * 0.95) },
+    rain: { label: '雨', motion: 'fall', vy: 900, sway: 0, d: { count: 220, size: 2, speed: 1, wind: 0.15, color: '#b8d4ff', color2: '#7fa8e0' },
+      draw: (ctx, q, pr) => {
+        const len = q.s * 9;
+        ctx.globalAlpha = q.a * 0.6; ctx.strokeStyle = q.color; ctx.lineWidth = Math.max(1, q.s * 0.6);
+        ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - pr.wind * len * 0.8, q.y - len); ctx.stroke();
+      } },
+    sakura: { label: '櫻花', motion: 'fall', vy: 55, sway: 50, d: { count: 70, size: 10, speed: 1, wind: 0.6, color: '#ffc4d6', color2: '#ff9ab8' },
+      draw: (ctx, q) => { ctx.globalAlpha = q.a; ctx.fillStyle = q.color; petal(ctx, q.x, q.y, q.s, q.spin, Math.cos(q.spin * 1.7)); } },
+    leaves: { label: '落葉', motion: 'fall', vy: 70, sway: 60, d: { count: 45, size: 14, speed: 1, wind: 0.5, color: '#e8923a', color2: '#c0392b' },
+      draw: (ctx, q) => {
+        ctx.globalAlpha = q.a; ctx.fillStyle = q.color; petal(ctx, q.x, q.y, q.s, q.spin, Math.cos(q.spin * 1.3) * 0.6);
+        ctx.strokeStyle = 'rgba(80,40,10,0.35)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(q.x - Math.sin(q.spin) * q.s, q.y + Math.cos(q.spin) * q.s * 0.2); ctx.lineTo(q.x + Math.sin(q.spin) * q.s, q.y); ctx.stroke();
+      } },
+    confetti: { label: '彩色紙花', motion: 'fall', vy: 160, sway: 30, palette: true, d: { count: 160, size: 9, speed: 1, wind: 0.2, color: '#ffd166', color2: '#ef476f' },
+      draw: (ctx, q) => {
+        ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.spin); ctx.scale(1, Math.cos(q.spin * 2.3));
+        ctx.globalAlpha = q.a; ctx.fillStyle = q.color; ctx.fillRect(-q.s / 2, -q.s * 0.3, q.s, q.s * 0.6); ctx.restore();
+      } },
+    bubbles: { label: '泡泡', motion: 'rise', vy: 70, sway: 25, d: { count: 40, size: 22, speed: 1, wind: 0, color: '#bfefff', color2: '#ffffff' },
+      draw: (ctx, q) => {
+        ctx.globalAlpha = q.a * 0.8; ctx.strokeStyle = q.color; ctx.lineWidth = Math.max(1, q.s * 0.08);
+        ctx.beginPath(); ctx.arc(q.x, q.y, q.s, 0, TAU); ctx.stroke();
+        ctx.globalAlpha = q.a * 0.6; ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(q.x - q.s * 0.35, q.y - q.s * 0.35, q.s * 0.18, 0, TAU); ctx.fill();
+      } },
+    embers: { label: '火星', motion: 'rise', vy: 90, sway: 30, life: true, d: { count: 90, size: 5, speed: 1, wind: 0.1, color: '#ffb347', color2: '#ff4e1a' },
+      draw: (ctx, q) => sprite(ctx, q.color, q.x, q.y, q.s * 3, q.a) },
+    lanterns: { label: '天燈', motion: 'rise', vy: 28, sway: 14, d: { count: 24, size: 26, speed: 1, wind: 0.1, color: '#ffb84d', color2: '#ff7a2f' },
+      draw: (ctx, q) => {
+        sprite(ctx, q.color, q.x, q.y, q.s * 4, q.a * 0.45);
+        ctx.globalAlpha = q.a;
+        const w = q.s, h = q.s * 1.25;
+        const g = ctx.createLinearGradient(0, q.y - h / 2, 0, q.y + h / 2);
+        g.addColorStop(0, rgba(q.color2)); g.addColorStop(1, rgba(mixColor(q.color, '#fff6c8', 0.5)));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(q.x - w * 0.42, q.y - h / 2); ctx.lineTo(q.x + w * 0.42, q.y - h / 2);
+        ctx.lineTo(q.x + w * 0.32, q.y + h / 2); ctx.lineTo(q.x - w * 0.32, q.y + h / 2); ctx.closePath(); ctx.fill();
+      } },
+    hearts: { label: '愛心飄升', motion: 'rise', vy: 60, sway: 30, d: { count: 36, size: 14, speed: 1, wind: 0, color: '#ff6b8b', color2: '#ffb3c6' },
+      draw: (ctx, q) => { ctx.globalAlpha = q.a; ctx.fillStyle = q.color; heart(ctx, q.x, q.y, q.s); } },
+    fireflies: { label: '螢火蟲', motion: 'wander', d: { count: 50, size: 6, speed: 1, wind: 0, color: '#d9ff7a', color2: '#fff3a0' },
+      draw: (ctx, q) => { const b = 0.35 + 0.65 * Math.pow(0.5 + 0.5 * Math.sin(q.t * 2.2 * q.r5 + q.r6 * TAU), 2); sprite(ctx, q.color, q.x, q.y, q.s * 4, q.a * b); } },
+    dust: { label: '光塵', motion: 'wander', d: { count: 120, size: 3, speed: 0.5, wind: 0, color: '#fff2cc', color2: '#ffffff' },
+      draw: (ctx, q) => sprite(ctx, q.color, q.x, q.y, q.s * 3, q.a * (0.3 + 0.5 * q.r5)) },
+    stars: { label: '星星閃爍', motion: 'static', d: { count: 160, size: 3, speed: 1, wind: 0, color: '#ffffff', color2: '#ffe9a8' },
+      draw: (ctx, q) => {
+        const tw = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(q.t * (1 + q.r5 * 3) + q.r6 * TAU));
+        sprite(ctx, q.color, q.x, q.y, q.s * 3, q.a * tw);
+        if (q.r7 > 0.93) {
+          ctx.globalAlpha = q.a * tw * 0.7; ctx.strokeStyle = q.color; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(q.x - q.s * 4, q.y); ctx.lineTo(q.x + q.s * 4, q.y); ctx.moveTo(q.x, q.y - q.s * 4); ctx.lineTo(q.x, q.y + q.s * 4); ctx.stroke();
+        }
+      } },
+    fog: { label: '霧氣', motion: 'drift', vx: 18, d: { count: 26, size: 220, speed: 1, wind: 1, color: '#ffffff', color2: '#dde6f0' },
+      draw: (ctx, q) => sprite(ctx, q.color, q.x, q.y, q.s * 2, q.a * 0.14) },
+    fireworks: { label: '煙火', motion: 'burst', d: { count: 240, size: 4, speed: 1, wind: 0, color: '#ffd166', color2: '#ff5d8f' } },
+  };
+
+  // Burst fireworks: `bursts` shells each own count/bursts sparks; each shell re-launches every `period` seconds
+  function drawFireworks(ctx, pr, t, W, H, A) {
+    const seed = pr.seed | 0;
+    const bursts = Math.max(1, Math.round(pr.count / 60));
+    const per = Math.max(8, Math.floor(pr.count / bursts));
+    const period = 2.6 / Math.max(0.05, pr.speed);
+    for (let b = 0; b < bursts; b++) {
+      const phase = hash(b * 13 + 1, seed) * period;
+      const cycle = Math.floor((t + phase) / period);
+      const age = (t + phase) / period - cycle; // 0..1 inside one launch
+      const k = b * 1000 + cycle;
+      const cx = (hash(k, seed + 3) - 0.5) * W * 0.8;
+      const cy = (hash(k, seed + 5) - 0.5) * H * 0.5 - H * 0.12;
+      const color = hash(k, seed + 7) < 0.5 ? pr.color : pr.color2;
+      const launch = 0.22;
+      if (age < launch) { // rising shell
+        const q = age / launch;
+        const y = H / 2 - (H / 2 - cy) * (1 - Math.pow(1 - q, 2));
+        sprite(ctx, color, cx, y, pr.size * 3, 0.9 * A);
+        continue;
+      }
+      const e = (age - launch) / (1 - launch);
+      const radius = Math.min(W, H) * 0.22 * (0.7 + hash(k, seed + 11) * 0.6);
+      const fadeA = Math.pow(1 - e, 1.6) * A;
+      for (let j = 0; j < per; j++) {
+        const ang = (j / per) * TAU + hash(j, k) * 0.3;
+        const sp = 0.65 + hash(j + 99, k) * 0.35;
+        const dist = radius * sp * (1 - Math.pow(1 - e, 3));
+        const x = cx + Math.cos(ang) * dist;
+        const y = cy + Math.sin(ang) * dist + e * e * radius * 0.5;
+        const tail = radius * sp * 0.12 * (1 - e);
+        ctx.globalAlpha = fadeA * 0.6; ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, pr.size * 0.4);
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - Math.cos(ang) * tail, y - Math.sin(ang) * tail); ctx.stroke();
+        sprite(ctx, color, x, y, pr.size * 2.5, fadeA);
+      }
+    }
+  }
+
+  function palette(pr) { return [pr.color, pr.color2, '#ffd166', '#06d6a0', '#4cc9f0', '#f72585']; }
+
+  function draw(p, pr, env) {
+    const ctx = p.drawingContext;
+    const preset = PRESETS[pr.preset] || PRESETS.snow;
+    const W = pr.w, H = pr.h, t = env.lt;
+    const seed = pr.seed | 0;
+    const baseAlpha = ctx.globalAlpha;
+    if (preset.motion === 'burst') { ctx.globalCompositeOperation = 'lighter'; drawFireworks(ctx, pr, t, W, H, baseAlpha); ctx.globalAlpha = baseAlpha; return; }
+    const n = Math.max(0, Math.min(2000, Math.round(pr.count)));
+    const sp = pr.speed;
+    const m = pr.size * 4 + 20; // wrap margin so particles leave fully before reappearing
+    const pal = preset.palette ? palette(pr) : null;
+    for (let i = 0; i < n; i++) {
+      const r = (k) => hash(i * 16 + k, seed);
+      const q = { t, r5: r(5), r6: r(6), r7: r(7), a: baseAlpha, s: pr.size * (0.5 + r(2)) };
+      q.color = pal ? pal[Math.floor(r(4) * pal.length)] : r(4) < 0.5 ? pr.color : pr.color2;
+      const depth = 0.55 + r(3) * 0.9; // parallax: bigger particles move faster
+      if (preset.motion === 'fall' || preset.motion === 'rise') {
+        const span = H + 2 * m, spanX = W + 2 * m;
+        const travel = preset.vy * sp * depth * t;
+        let y = (((r(1) * span + travel) % span) + span) % span;
+        if (preset.motion === 'rise') y = span - y;
+        const sway = Math.sin(t * sp * (0.6 + r(8)) + r(9) * TAU) * (preset.sway || 0) * depth;
+        const x = ((((r(0) * spanX + pr.wind * 80 * sp * depth * t + sway) % spanX) + spanX) % spanX);
+        q.x = x - m - W / 2; q.y = y - m - H / 2;
+        q.spin = r(10) * TAU + t * sp * (r(11) - 0.5) * 4;
+        if (preset.life) q.a *= Math.sin(Math.PI * Math.min(1, y / span));
+      } else if (preset.motion === 'drift') {
+        const spanX = W + 2 * m;
+        const x = (((r(0) * spanX + preset.vx * pr.wind * sp * depth * t) % spanX) + spanX) % spanX;
+        q.x = x - m - W / 2;
+        q.y = (r(1) - 0.5) * H + Math.sin(t * 0.3 * sp + r(9) * TAU) * 20;
+      } else if (preset.motion === 'wander') {
+        const f = 0.12 * sp;
+        q.x = (r(0) - 0.5) * W + (noise(t * f + r(8) * 50, i * 0.37, 0, seed) - 0.5) * W * 0.35;
+        q.y = (r(1) - 0.5) * H + (noise(t * f + r(9) * 50, i * 0.37, 7, seed) - 0.5) * H * 0.35;
+      } else {
+        q.x = (r(0) - 0.5) * W; q.y = (r(1) - 0.5) * H;
+      }
+      preset.draw(ctx, q, pr);
+    }
+    ctx.globalAlpha = baseAlpha;
+  }
+
+  registerType('particles', {
+    label: '粒子', category: 'particles',
+    props: [
+      { key: 'preset', label: '效果', type: 'select', default: 'snow', group: 'main', options: Object.entries(PRESETS).map(([k, v]) => [k, v.label]) },
+      { key: 'count', label: '數量', type: 'number', min: 0, max: 2000, step: 1, default: 180, group: 'main', anim: true },
+      { key: 'size', label: '大小', type: 'number', min: 0.5, step: 0.5, default: 7, group: 'main', anim: true },
+      { key: 'speed', label: '速度', type: 'range', min: 0, max: 4, step: 0.05, default: 1, group: 'main', anim: true },
+      { key: 'wind', label: '風向', type: 'range', min: -3, max: 3, step: 0.05, default: 0.3, group: 'main', anim: true },
+      { key: 'color', label: '顏色 1', type: 'color', default: '#ffffff', group: 'main', anim: true },
+      { key: 'color2', label: '顏色 2', type: 'color', default: '#d6e9ff', group: 'main', anim: true },
+      { key: 'w', label: '範圍寬', type: 'number', min: 1, step: 1, default: (s) => s.width, group: 'main' },
+      { key: 'h', label: '範圍高', type: 'number', min: 1, step: 1, default: (s) => s.height, group: 'main' },
+      { key: 'seed', label: '隨機種子', type: 'number', step: 1, default: 1, group: 'main' },
+    ],
+    draw,
+    bounds: (pr) => ({ w: pr.w, h: pr.h }),
+  });
+
+  P5M.particlePresets = PRESETS;
+})();
+
+</script>
+<script>
+// Generative art layers. Each preset is a pure function of time; `uses` lists which generic params it reads
+// so the inspector can hide the rest.
+(function () {
+  const P5M = window.P5M;
+  const { registerType, hash, noise, rgba, mixColor } = P5M;
+  const TAU = Math.PI * 2;
+
+  const PRESETS = {
+    gradientSky: {
+      label: '漸層天空', uses: ['color', 'color2', 'color3', 'amount'],
+      d: { color: '#0b1a3a', color2: '#4a3a78', color3: '#f29b76', amount: 0.3 },
+      draw(ctx, pr, t, W, H) {
+        const shift = Math.sin(t * 0.2 * pr.speed) * 0.08 * pr.amount;
+        const g = ctx.createLinearGradient(0, -H / 2, 0, H / 2);
+        g.addColorStop(0, rgba(pr.color)); g.addColorStop(Math.max(0.05, Math.min(0.95, 0.55 + shift)), rgba(pr.color2)); g.addColorStop(1, rgba(pr.color3));
+        ctx.fillStyle = g; ctx.fillRect(-W / 2, -H / 2, W, H);
+      },
+    },
+    moon: {
+      label: '明月', uses: ['color', 'color2', 'amount', 'density'],
+      d: { color: '#fff6d8', color2: '#ffd98a', amount: 1, density: 0.5, w: 360, h: 360 },
+      draw(ctx, pr, t, W, H) {
+        const R = Math.min(W, H) * 0.32;
+        const HR = R * (1.6 + pr.amount * 0.8);
+        const halo = ctx.createRadialGradient(0, 0, R * 0.8, 0, 0, HR);
+        halo.addColorStop(0, rgba(pr.color2, 0.55 * pr.amount)); halo.addColorStop(1, rgba(pr.color2, 0));
+        // fill a disc, not the W x H box: the halo is wider than the box and a rect would show hard edges
+        ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(0, 0, HR, 0, TAU); ctx.fill();
+        const body = ctx.createRadialGradient(-R * 0.3, -R * 0.3, R * 0.1, 0, 0, R);
+        body.addColorStop(0, rgba(mixColor(pr.color, '#ffffff', 0.5))); body.addColorStop(1, rgba(pr.color2));
+        ctx.fillStyle = body; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+        ctx.save(); ctx.clip();
+        const n = Math.round(4 + pr.density * 14);
+        for (let i = 0; i < n; i++) {
+          const a = hash(i, pr.seed) * TAU, d = Math.sqrt(hash(i + 50, pr.seed)) * R * 0.85, r = R * (0.05 + hash(i + 90, pr.seed) * 0.16);
+          ctx.fillStyle = rgba(pr.color2, 0.28);
+          ctx.beginPath(); ctx.arc(Math.cos(a) * d, Math.sin(a) * d, r, 0, TAU); ctx.fill();
+        }
+        ctx.restore();
+      },
+    },
+    clouds: {
+      label: '雲朵', uses: ['color', 'color2', 'density', 'speed'],
+      d: { color: '#ffffff', color2: '#dfe7f2', density: 0.5, speed: 1 },
+      draw(ctx, pr, t, W, H) {
+        const n = Math.round(3 + pr.density * 9);
+        for (let i = 0; i < n; i++) {
+          const sz = (0.12 + hash(i, pr.seed) * 0.16) * W;
+          const span = W + sz * 3;
+          const x = ((((hash(i + 7, pr.seed) * span + t * pr.speed * (12 + hash(i + 3, pr.seed) * 20)) % span) + span) % span) - span / 2;
+          const y = (hash(i + 11, pr.seed) - 0.5) * H * 0.8;
+          for (let k = 0; k < 6; k++) {
+            const bx = x + (k - 2.5) * sz * 0.32, by = y - Math.sin((k / 5) * Math.PI) * sz * 0.28;
+            const r = sz * (0.22 + 0.14 * Math.sin((k / 5) * Math.PI));
+            ctx.fillStyle = rgba(k % 2 ? pr.color : pr.color2, 0.9);
+            ctx.beginPath(); ctx.arc(bx, by, r, 0, TAU); ctx.fill();
+          }
+        }
+      },
+    },
+    mountains: {
+      label: '層疊山巒', uses: ['color', 'color2', 'density', 'speed', 'amount'],
+      d: { color: '#2d3b5c', color2: '#0c1222', density: 0.5, speed: 0.3, amount: 1 },
+      draw(ctx, pr, t, W, H) {
+        const layers = Math.round(3 + pr.density * 4);
+        for (let l = 0; l < layers; l++) {
+          const k = layers > 1 ? l / (layers - 1) : 1;
+          const base = -H * 0.1 + k * H * 0.35;
+          const amp = H * (0.1 + 0.15 * pr.amount) * (1 - k * 0.3);
+          const scroll = t * pr.speed * (20 + k * 60);
+          ctx.fillStyle = rgba(mixColor(pr.color, pr.color2, k));
+          ctx.beginPath(); ctx.moveTo(-W / 2, H / 2);
+          for (let x = -W / 2; x <= W / 2 + 8; x += 8) {
+            const n1 = noise((x + scroll) * 0.0025, l * 3.1, 0, pr.seed), n2 = noise((x + scroll) * 0.012, l * 5.3, 1, pr.seed);
+            ctx.lineTo(x, base - (n1 * 0.8 + n2 * 0.2) * amp);
+          }
+          ctx.lineTo(W / 2, H / 2); ctx.closePath(); ctx.fill();
+        }
+      },
+    },
+    waves: {
+      label: '海浪', uses: ['color', 'color2', 'density', 'speed', 'amount'],
+      d: { color: '#4cc9f0', color2: '#123a6b', density: 0.5, speed: 1, amount: 1 },
+      draw(ctx, pr, t, W, H) {
+        const layers = Math.round(3 + pr.density * 5);
+        for (let l = 0; l < layers; l++) {
+          const k = layers > 1 ? l / (layers - 1) : 1;
+          const base = k * H * 0.4 - H * 0.05;
+          const amp = (10 + 30 * pr.amount) * (0.5 + k);
+          ctx.fillStyle = rgba(mixColor(pr.color, pr.color2, k), 0.85);
+          ctx.beginPath(); ctx.moveTo(-W / 2, H / 2);
+          for (let x = -W / 2; x <= W / 2 + 8; x += 8) {
+            const y = base + Math.sin(x * 0.008 + t * pr.speed * (1 + k) + l * 1.7) * amp + Math.sin(x * 0.021 - t * pr.speed * 1.3 + l) * amp * 0.35;
+            ctx.lineTo(x, y);
+          }
+          ctx.lineTo(W / 2, H / 2); ctx.closePath(); ctx.fill();
+        }
+      },
+    },
+    aurora: {
+      label: '極光', uses: ['color', 'color2', 'density', 'speed', 'amount'],
+      d: { color: '#3ef0a0', color2: '#8a5cff', density: 0.5, speed: 1, amount: 1 },
+      draw(ctx, pr, t, W, H) {
+        ctx.globalCompositeOperation = 'lighter';
+        const bands = Math.round(2 + pr.density * 3);
+        const base = ctx.globalAlpha;
+        for (let b = 0; b < bands; b++) {
+          const col = b % 2 ? pr.color2 : pr.color;
+          for (let x = -W / 2; x <= W / 2; x += 6) {
+            const n = noise(x * 0.003 + b * 10, t * 0.15 * pr.speed, b, pr.seed);
+            const top = -H * 0.35 + n * H * 0.35 + b * 20;
+            const len = H * (0.15 + 0.35 * noise(x * 0.006, t * 0.3 * pr.speed, b + 5, pr.seed)) * pr.amount;
+            const g = ctx.createLinearGradient(0, top, 0, top + len);
+            g.addColorStop(0, rgba(col, 0)); g.addColorStop(0.3, rgba(col, 0.16)); g.addColorStop(1, rgba(col, 0));
+            ctx.globalAlpha = base; ctx.fillStyle = g; ctx.fillRect(x, top, 7, len);
+          }
+        }
+      },
+    },
+    flowfield: {
+      label: '流場線條', uses: ['color', 'color2', 'density', 'speed', 'amount'],
+      d: { color: '#ffd166', color2: '#4cc9f0', density: 0.5, speed: 1, amount: 1 },
+      draw(ctx, pr, t, W, H) {
+        const n = Math.round(80 + pr.density * 520);
+        const steps = 26, stepLen = 7;
+        ctx.lineWidth = 1.2 + pr.amount; ctx.lineCap = 'round';
+        for (const [ci, col] of [[0, pr.color], [1, pr.color2]]) {
+          ctx.strokeStyle = rgba(col, 0.55); ctx.beginPath();
+          for (let i = ci; i < n; i += 2) {
+            let x = (hash(i, pr.seed) - 0.5) * W, y = (hash(i + 5000, pr.seed) - 0.5) * H;
+            ctx.moveTo(x, y);
+            for (let s = 0; s < steps; s++) {
+              const a = noise(x * 0.0022, y * 0.0022, t * 0.12 * pr.speed, pr.seed) * TAU * 2;
+              x += Math.cos(a) * stepLen; y += Math.sin(a) * stepLen;
+              ctx.lineTo(x, y);
+            }
+          }
+          ctx.stroke();
+        }
+      },
+    },
+    mandala: {
+      label: '萬花筒', uses: ['color', 'color2', 'color3', 'density', 'speed', 'amount'],
+      d: { color: '#ffd166', color2: '#ef476f', color3: '#118ab2', density: 0.5, speed: 1, amount: 1, w: 640, h: 640 },
+      draw(ctx, pr, t, W, H) {
+        const folds = Math.round(6 + pr.density * 12);
+        const R = Math.min(W, H) * 0.46;
+        const cols = [pr.color, pr.color2, pr.color3];
+        for (let ring = 0; ring < 4; ring++) {
+          const rr = R * (1 - ring * 0.22);
+          const rot = t * pr.speed * 0.3 * (ring % 2 ? -1 : 1);
+          const petal = rr * (0.28 + 0.06 * Math.sin(t * pr.speed * 1.5 + ring) * pr.amount);
+          ctx.fillStyle = rgba(cols[ring % 3], 0.75);
+          for (let f = 0; f < folds; f++) {
+            ctx.save(); ctx.rotate(rot + (f / folds) * TAU);
+            ctx.beginPath(); ctx.moveTo(0, -rr + petal * 2);
+            ctx.quadraticCurveTo(petal * 0.6, -rr + petal, 0, -rr);
+            ctx.quadraticCurveTo(-petal * 0.6, -rr + petal, 0, -rr + petal * 2);
+            ctx.fill(); ctx.restore();
+          }
+        }
+        ctx.fillStyle = rgba(pr.color); ctx.beginPath(); ctx.arc(0, 0, R * 0.08, 0, TAU); ctx.fill();
+      },
+    },
+    dotgrid: {
+      label: '波動點陣', uses: ['color', 'color2', 'density', 'speed', 'amount'],
+      d: { color: '#ffffff', color2: '#4cc9f0', density: 0.5, speed: 1, amount: 1 },
+      draw(ctx, pr, t, W, H) {
+        const gap = 70 - pr.density * 50;
+        for (let y = -H / 2 + gap / 2; y < H / 2; y += gap) for (let x = -W / 2 + gap / 2; x < W / 2; x += gap) {
+          const d = Math.hypot(x, y);
+          const w = 0.5 + 0.5 * Math.sin(d * 0.02 - t * pr.speed * 2.5);
+          ctx.fillStyle = rgba(mixColor(pr.color2, pr.color, w));
+          ctx.beginPath(); ctx.arc(x, y, gap * 0.08 + gap * 0.28 * w * pr.amount, 0, TAU); ctx.fill();
+        }
+      },
+    },
+    ripples: {
+      label: '漣漪', uses: ['color', 'density', 'speed', 'amount'],
+      d: { color: '#bfefff', density: 0.4, speed: 1, amount: 1 },
+      draw(ctx, pr, t, W, H) {
+        const n = Math.round(2 + pr.density * 10);
+        const period = 3 / Math.max(0.05, pr.speed);
+        ctx.strokeStyle = rgba(pr.color); ctx.lineWidth = 2;
+        const base = ctx.globalAlpha;
+        for (let i = 0; i < n; i++) {
+          const ph = hash(i, pr.seed) * period;
+          const cyc = Math.floor((t + ph) / period), age = (t + ph) / period - cyc;
+          const k = i * 997 + cyc;
+          const x = (hash(k, pr.seed + 1) - 0.5) * W, y = (hash(k, pr.seed + 2) - 0.5) * H;
+          for (let r = 0; r < 3; r++) {
+            const a = age - r * 0.12;
+            if (a <= 0) continue;
+            ctx.globalAlpha = base * (1 - a) * 0.8;
+            ctx.beginPath(); ctx.ellipse(x, y, a * 160 * pr.amount, a * 60 * pr.amount, 0, 0, TAU); ctx.stroke();
+          }
+        }
+        ctx.globalAlpha = base;
+      },
+    },
+    starfield: {
+      label: '星際穿梭', uses: ['color', 'density', 'speed'],
+      d: { color: '#ffffff', density: 0.5, speed: 1 },
+      draw(ctx, pr, t, W, H) {
+        const n = Math.round(100 + pr.density * 700);
+        ctx.strokeStyle = rgba(pr.color); ctx.lineCap = 'round';
+        const base = ctx.globalAlpha;
+        for (let i = 0; i < n; i++) {
+          const z = 1 - ((((hash(i, pr.seed) + t * 0.25 * pr.speed) % 1) + 1) % 1);
+          const z2 = Math.min(1, z + 0.03 * pr.speed);
+          const ax = (hash(i + 7000, pr.seed) - 0.5) * W, ay = (hash(i + 9000, pr.seed) - 0.5) * H;
+          const f = 0.15;
+          const x1 = (ax * f) / Math.max(0.01, z), y1 = (ay * f) / Math.max(0.01, z);
+          const x2 = (ax * f) / z2, y2 = (ay * f) / z2;
+          ctx.globalAlpha = base * Math.min(1, (1 - z) * 1.5);
+          ctx.lineWidth = Math.max(0.5, (1 - z) * 3);
+          ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x1, y1); ctx.stroke();
+        }
+        ctx.globalAlpha = base;
+      },
+    },
+    sunburst: {
+      label: '放射光芒', uses: ['color', 'color2', 'density', 'speed'],
+      d: { color: '#ffe08a', color2: '#ffb347', density: 0.5, speed: 1 },
+      draw(ctx, pr, t, W, H) {
+        const rays = Math.round(8 + pr.density * 28);
+        const R = Math.hypot(W, H);
+        const rot = t * pr.speed * 0.15;
+        ctx.save(); ctx.beginPath(); ctx.rect(-W / 2, -H / 2, W, H); ctx.clip();
+        for (let i = 0; i < rays; i++) {
+          const a0 = rot + (i / rays) * TAU, a1 = a0 + TAU / rays;
+          ctx.fillStyle = rgba(i % 2 ? pr.color : pr.color2);
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, a0, a1); ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
+      },
+    },
+  };
+
+  const has = (key) => (pr) => (PRESETS[pr.preset] || PRESETS.gradientSky).uses.includes(key);
+
+  registerType('gen', {
+    label: '生成藝術', category: 'gen',
+    props: [
+      { key: 'preset', label: '樣式', type: 'select', default: 'gradientSky', group: 'main', options: Object.entries(PRESETS).map(([k, v]) => [k, v.label]) },
+      { key: 'color', label: '顏色 1', type: 'color', default: '#0b1a3a', group: 'main', anim: true, when: has('color') },
+      { key: 'color2', label: '顏色 2', type: 'color', default: '#4a3a78', group: 'main', anim: true, when: has('color2') },
+      { key: 'color3', label: '顏色 3', type: 'color', default: '#f29b76', group: 'main', anim: true, when: has('color3') },
+      { key: 'density', label: '密度', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, group: 'main', when: has('density') },
+      { key: 'speed', label: '速度', type: 'range', min: 0, max: 4, step: 0.05, default: 1, group: 'main', anim: true },
+      { key: 'amount', label: '強度', type: 'range', min: 0, max: 2, step: 0.01, default: 1, group: 'main', anim: true, when: has('amount') },
+      { key: 'w', label: '範圍寬', type: 'number', min: 1, step: 1, default: (s) => s.width, group: 'main' },
+      { key: 'h', label: '範圍高', type: 'number', min: 1, step: 1, default: (s) => s.height, group: 'main' },
+      { key: 'seed', label: '隨機種子', type: 'number', step: 1, default: 1, group: 'main' },
+    ],
+    draw(p, pr, env) {
+      const ctx = p.drawingContext;
+      (PRESETS[pr.preset] || PRESETS.gradientSky).draw(ctx, pr, env.lt, pr.w, pr.h);
+    },
+    bounds: (pr) => ({ w: pr.w, h: pr.h }),
+  });
+
+  P5M.genPresets = PRESETS;
+})();
+
+</script>
+<script>
+// 3D primitives drawn into one shared WEBGL buffer per p5 instance, then composited onto the 2D canvas.
+// The clip's 2D scale is folded into the 3D size so the result stays sharp instead of being bitmap-scaled.
+(function () {
+  const P5M = window.P5M;
+  const { registerType, parseColor } = P5M;
+
+  function buffer(p, W, H) {
+    let g = p._p5m3d;
+    if (!g || g.width !== W || g.height !== H) {
+      if (g) g.remove();
+      g = p._p5m3d = p.createGraphics(W, H, p.WEBGL);
+      g.pixelDensity(1);
+      g.setAttributes && g.setAttributes('alpha', true);
+    }
+    return g;
+  }
+
+  // p5 texture() needs a p5 object; wrap each image asset once in a 2D p5.Graphics
+  const texCache = new WeakMap();
+  function texture(p, img) {
+    let per = texCache.get(p);
+    if (!per) { per = new Map(); texCache.set(p, per); }
+    let t = per.get(img);
+    if (!t) {
+      t = p.createGraphics(img.naturalWidth || img.width, img.naturalHeight || img.height);
+      t.pixelDensity(1);
+      t.drawingContext.drawImage(img, 0, 0);
+      per.set(img, t);
+    }
+    return t;
+  }
+
+  function shape(g, kind, s, detail) {
+    switch (kind) {
+      case 'sphere': g.sphere(s / 2, detail, detail); break;
+      case 'ellipsoid': g.ellipsoid(s / 2, s / 3, s / 2.6, detail, detail); break;
+      case 'torus': g.torus(s / 2.8, s / 8, detail * 2, detail); break;
+      case 'cone': g.cone(s / 2.4, s, detail, 1); break;
+      case 'cylinder': g.cylinder(s / 2.4, s, detail, 1); break;
+      case 'plane': g.plane(s, s); break;
+      default: g.box(s);
+    }
+  }
+
+  function draw(p, pr, env) {
+    const W = env.W, H = env.H;
+    const g = buffer(p, W, H);
+    const kx = Math.abs(env.sx) || 1, ky = Math.abs(env.sy) || 1;
+    const k = Math.max(kx, ky);
+    const lt = env.lt;
+    const [r, gg, b] = parseColor(pr.color);
+    g.clear();
+    g.reset();
+    g.push();
+    g.noStroke();
+    const asset = pr.texture && env.project.assets[pr.texture];
+    const img = asset ? P5M.assets.image(asset) : null;
+    if (pr.material === 'normal') g.normalMaterial();
+    else {
+      g.ambientLight(pr.ambient * 255);
+      g.directionalLight(255, 255, 255, -0.4, 0.5, -1);
+      if (pr.material === 'wireframe') { g.noFill(); g.stroke(r, gg, b); g.strokeWeight(1.5); }
+      else if (img) g.texture(texture(p, img));
+      // specularMaterial only sets the highlight colour; the body colour comes from fill (default white)
+      else if (pr.material === 'specular') { g.fill(r, gg, b); g.specularMaterial(255); g.shininess(40); g.pointLight(255, 255, 255, 200, -200, 400); }
+      else { g.ambientMaterial(r, gg, b); g.fill(r, gg, b); }
+    }
+    const D = Math.PI / 180;
+    g.rotateX((pr.tiltX + lt * pr.spinX) * D);
+    g.rotateY((pr.tiltY + lt * pr.spinY) * D);
+    g.rotateZ((pr.tiltZ + lt * pr.spinZ) * D);
+    shape(g, pr.kind, pr.size * k, pr.detail);
+    g.pop();
+    const ctx = p.drawingContext;
+    ctx.scale(1 / kx, 1 / ky);
+    ctx.drawImage(g.elt, -W / 2, -H / 2, W, H);
+  }
+
+  registerType('shape3d', {
+    label: '3D 物件', category: '3d',
+    props: [
+      { key: 'kind', label: '形狀', type: 'select', default: 'box', group: 'main', options: [
+        ['box', '立方體'], ['sphere', '球體'], ['torus', '甜甜圈'], ['cone', '圓錐'], ['cylinder', '圓柱'], ['ellipsoid', '橢球'], ['plane', '平面卡片']] },
+      { key: 'size', label: '尺寸', type: 'number', min: 1, step: 1, default: 220, group: 'main', anim: true },
+      { key: 'color', label: '顏色', type: 'color', default: '#ff8a5c', group: 'main', anim: true },
+      { key: 'material', label: '材質', type: 'select', default: 'lit', group: 'main', options: [
+        ['lit', '霧面'], ['specular', '亮面'], ['normal', '彩虹法線'], ['wireframe', '線框']] },
+      { key: 'texture', label: '貼圖', type: 'asset', accept: 'image', group: 'main', when: (pr) => pr.material === 'lit' },
+      { key: 'ambient', label: '環境光', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35, group: 'main', anim: true },
+      { key: 'spinX', label: 'X 自轉（°/秒）', type: 'number', step: 1, default: 20, group: 'main', anim: true },
+      { key: 'spinY', label: 'Y 自轉（°/秒）', type: 'number', step: 1, default: 40, group: 'main', anim: true },
+      { key: 'spinZ', label: 'Z 自轉（°/秒）', type: 'number', step: 1, default: 0, group: 'main', anim: true },
+      { key: 'tiltX', label: 'X 傾斜', type: 'number', step: 1, default: -20, unit: '°', group: 'main', anim: true },
+      { key: 'tiltY', label: 'Y 傾斜', type: 'number', step: 1, default: 30, unit: '°', group: 'main', anim: true },
+      { key: 'tiltZ', label: 'Z 傾斜', type: 'number', step: 1, default: 0, unit: '°', group: 'main', anim: true },
+      { key: 'detail', label: '細緻度', type: 'number', min: 6, max: 48, step: 1, default: 24, group: 'main' },
+    ],
+    draw,
+    bounds: (pr) => ({ w: pr.size * 1.4, h: pr.size * 1.4 }),
+  });
+
+  // Compile the default shaders once so the first 3D frame during playback does not stall (~115 ms measured)
+  P5M.warm3d = function (p, W, H) {
+    const g = buffer(p, W, H);
+    g.clear(); g.push(); g.normalMaterial(); g.box(10);
+    g.ambientLight(80); g.directionalLight(255, 255, 255, 0, 0, -1); g.ambientMaterial(200); g.sphere(10, 8, 8);
+    g.specularMaterial(200); g.pointLight(255, 255, 255, 0, 0, 100); g.torus(10, 3, 8, 6); g.pop(); g.clear();
+  };
+})();
+
+</script>
+<script>
+// Screen-space layers: adjustment effects apply to everything already drawn below them (lower tracks),
+// transitions cover the cut between clips. The renderer calls draw() with an identity transform.
+// Intensity k = animState alpha, so in/out fade presets ramp an effect in and out.
+(function () {
+  const P5M = window.P5M;
+  const { registerType, rgba, hash, ease, clamp } = P5M;
+
+  let tmp = null;
+  function snapshot(ctx, W, H) {
+    if (!tmp) tmp = document.createElement('canvas');
+    if (tmp.width !== W || tmp.height !== H) { tmp.width = W; tmp.height = H; }
+    const tc = tmp.getContext('2d');
+    tc.globalCompositeOperation = 'copy';
+    tc.drawImage(ctx.canvas, 0, 0);
+    return tmp;
+  }
+  // Redraw the current frame through a CSS filter string, mixed in with strength k
+  function refilter(ctx, W, H, filter, k) {
+    if (k <= 0.001 || !filter) return;
+    const src = snapshot(ctx, W, H);
+    ctx.save();
+    ctx.globalAlpha = clamp(k, 0, 1);
+    ctx.filter = filter;
+    ctx.drawImage(src, 0, 0);
+    ctx.restore();
+  }
+
+  const grainTiles = [];
+  function grainTile(i) {
+    if (!grainTiles[i]) {
+      const c = document.createElement('canvas');
+      c.width = c.height = 256;
+      const g = c.getContext('2d', { willReadFrequently: true }); // CPU-backed, same reason as particle sprites
+      const img = g.createImageData(256, 256);
+      for (let j = 0; j < 256 * 256; j++) {
+        const v = 128 + (hash(j, i * 31 + 5) - 0.5) * 255;
+        img.data[j * 4] = img.data[j * 4 + 1] = img.data[j * 4 + 2] = v;
+        img.data[j * 4 + 3] = 255;
+      }
+      g.putImageData(img, 0, 0);
+      grainTiles[i] = c;
+    }
+    return grainTiles[i];
+  }
+
+  const BLENDS = [['multiply', '色彩增值'], ['screen', '濾色'], ['overlay', '覆蓋'], ['soft-light', '柔光'], ['color', '顏色'], ['source-over', '一般']];
+  const amountProp = (def = 0.5, max = 1) => ({ key: 'amount', label: '強度', type: 'range', min: 0, max, step: 0.01, default: def, group: 'main', anim: true });
+
+  const EFFECTS = {
+    vignette: {
+      label: '暗角', props: [amountProp(0.55), { key: 'color', label: '顏色', type: 'color', default: '#000000', group: 'main', anim: true },
+        { key: 'size', label: '範圍', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45, group: 'main', anim: true }],
+      draw(ctx, pr, W, H, k) {
+        const R = Math.hypot(W, H) / 2;
+        const g = ctx.createRadialGradient(W / 2, H / 2, R * pr.size * 0.9, W / 2, H / 2, R);
+        g.addColorStop(0, rgba(pr.color, 0)); g.addColorStop(1, rgba(pr.color, clamp(pr.amount * k, 0, 1)));
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      },
+    },
+    grain: {
+      label: '底片顆粒', props: [amountProp(0.3)],
+      draw(ctx, pr, W, H, k, lt) {
+        ctx.globalCompositeOperation = 'overlay';
+        ctx.globalAlpha = clamp(pr.amount * k, 0, 1);
+        ctx.fillStyle = ctx.createPattern(grainTile(Math.floor(lt * 12) % 4), 'repeat');
+        ctx.fillRect(0, 0, W, H);
+      },
+    },
+    grade: {
+      label: '調色', props: [
+        { key: 'brightness', label: '亮度', type: 'range', min: 0, max: 2, step: 0.01, default: 1, group: 'main', anim: true },
+        { key: 'contrast', label: '對比', type: 'range', min: 0, max: 2, step: 0.01, default: 1.1, group: 'main', anim: true },
+        { key: 'saturate', label: '飽和度', type: 'range', min: 0, max: 3, step: 0.01, default: 1.2, group: 'main', anim: true },
+        { key: 'hue', label: '色相', type: 'range', min: -180, max: 180, step: 1, default: 0, unit: '°', group: 'main', anim: true },
+        { key: 'sepia', label: '懷舊', type: 'range', min: 0, max: 1, step: 0.01, default: 0, group: 'main', anim: true },
+        { key: 'grayscale', label: '黑白', type: 'range', min: 0, max: 1, step: 0.01, default: 0, group: 'main', anim: true }],
+      draw(ctx, pr, W, H, k) {
+        refilter(ctx, W, H, `brightness(${pr.brightness}) contrast(${pr.contrast}) saturate(${pr.saturate}) hue-rotate(${pr.hue}deg) sepia(${pr.sepia}) grayscale(${pr.grayscale})`, k);
+      },
+    },
+    blur: {
+      label: '畫面模糊', props: [{ key: 'amount', label: '模糊程度', type: 'range', min: 0, max: 40, step: 0.5, default: 8, group: 'main', anim: true }],
+      draw(ctx, pr, W, H, k) { refilter(ctx, W, H, `blur(${pr.amount * k}px)`, 1); },
+    },
+    glow: {
+      label: '柔焦光暈', props: [amountProp(0.5), { key: 'radius', label: '光暈大小', type: 'range', min: 1, max: 60, step: 1, default: 18, group: 'main', anim: true }],
+      draw(ctx, pr, W, H, k) {
+        const src = snapshot(ctx, W, H);
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = clamp(pr.amount * k, 0, 1);
+        ctx.filter = `blur(${pr.radius}px)`;
+        ctx.drawImage(src, 0, 0);
+      },
+    },
+    tint: {
+      label: '色彩濾鏡', props: [amountProp(0.35), { key: 'color', label: '顏色', type: 'color', default: '#ff9a3c', group: 'main', anim: true },
+        { key: 'mode', label: '混合', type: 'select', default: 'soft-light', group: 'main', options: BLENDS }],
+      draw(ctx, pr, W, H, k) {
+        ctx.globalCompositeOperation = pr.mode;
+        ctx.globalAlpha = clamp(pr.amount * k, 0, 1);
+        ctx.fillStyle = rgba(pr.color); ctx.fillRect(0, 0, W, H);
+      },
+    },
+    lightLeak: {
+      label: '漏光', props: [amountProp(0.5), { key: 'color', label: '顏色 1', type: 'color', default: '#ff7a3c', group: 'main', anim: true },
+        { key: 'color2', label: '顏色 2', type: 'color', default: '#ffd36b', group: 'main', anim: true },
+        { key: 'speed', label: '速度', type: 'range', min: 0, max: 3, step: 0.05, default: 1, group: 'main' }],
+      draw(ctx, pr, W, H, k, lt) {
+        ctx.globalCompositeOperation = 'screen';
+        [[pr.color, 0], [pr.color2, 1]].forEach(([c, i]) => {
+          const x = W * (0.5 + 0.6 * Math.sin(lt * 0.35 * pr.speed + i * 2.2)), y = H * (0.5 + 0.5 * Math.cos(lt * 0.27 * pr.speed + i * 1.3));
+          const g = ctx.createRadialGradient(x, y, 0, x, y, W * 0.55);
+          g.addColorStop(0, rgba(c, clamp(pr.amount * k, 0, 1))); g.addColorStop(1, rgba(c, 0));
+          ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        });
+      },
+    },
+    fade: {
+      label: '黑場淡入淡出', props: [{ key: 'color', label: '顏色', type: 'color', default: '#000000', group: 'main', anim: true },
+        { key: 'mode', label: '方向', type: 'select', default: 'out', group: 'main', options: [['out', '畫面漸漸變成顏色'], ['in', '由顏色漸漸出現']] }],
+      draw(ctx, pr, W, H, k, lt, dur, since) {
+        const p = ease('sine', dur > 0 ? since / dur : 1);
+        ctx.globalAlpha = clamp((pr.mode === 'in' ? 1 - p : p) * k, 0, 1);
+        ctx.fillStyle = rgba(pr.color); ctx.fillRect(0, 0, W, H);
+      },
+    },
+    flash: {
+      label: '閃白', props: [amountProp(1), { key: 'color', label: '顏色', type: 'color', default: '#ffffff', group: 'main', anim: true }],
+      draw(ctx, pr, W, H, k, lt, dur, since) {
+        ctx.globalAlpha = clamp(pr.amount * k * Math.pow(1 - clamp(since / Math.max(0.01, dur), 0, 1), 2), 0, 1);
+        ctx.fillStyle = rgba(pr.color); ctx.fillRect(0, 0, W, H);
+      },
+    },
+    letterbox: {
+      label: '電影黑邊', props: [{ key: 'ratio', label: '畫面比例', type: 'select', default: 2.35, group: 'main', options: [[2.35, '2.35：1'], [2, '2：1'], [1.85, '1.85：1']] },
+        { key: 'color', label: '顏色', type: 'color', default: '#000000', group: 'main' }],
+      draw(ctx, pr, W, H, k) {
+        const bar = Math.max(0, (H - W / pr.ratio) / 2) * clamp(k, 0, 1);
+        ctx.fillStyle = rgba(pr.color);
+        ctx.fillRect(0, 0, W, bar); ctx.fillRect(0, H - bar, W, bar);
+      },
+    },
+  };
+
+  // Transitions: progress p = 0..1 across the clip, fully covered at p = 0.5
+  const TRANSITIONS = {
+    fadeThrough: {
+      label: '淡化過場', props: [{ key: 'color', label: '顏色', type: 'color', default: '#000000', group: 'main' }],
+      draw(ctx, pr, W, H, p) {
+        ctx.globalAlpha = ease('sine', 1 - Math.abs(2 * p - 1));
+        ctx.fillStyle = rgba(pr.color); ctx.fillRect(0, 0, W, H);
+      },
+    },
+    wipe: {
+      label: '推移擦除', props: [{ key: 'color', label: '顏色', type: 'color', default: '#111111', group: 'main' },
+        { key: 'dir', label: '方向', type: 'select', default: 'right', group: 'main', options: [['right', '向右'], ['left', '向左'], ['down', '向下'], ['up', '向上']] }],
+      draw(ctx, pr, W, H, p) {
+        const a = ease('easeInOut', clamp(p * 2, 0, 1)), b = ease('easeInOut', clamp(p * 2 - 1, 0, 1));
+        const horiz = pr.dir === 'right' || pr.dir === 'left';
+        const L = horiz ? W : H;
+        let s = b * L, e = a * L;
+        if (pr.dir === 'left' || pr.dir === 'up') { const s2 = L - e; e = L - s; s = s2; }
+        ctx.fillStyle = rgba(pr.color);
+        if (horiz) ctx.fillRect(s, 0, e - s, H); else ctx.fillRect(0, s, W, e - s);
+      },
+    },
+    iris: {
+      label: '圓形轉場', props: [{ key: 'color', label: '顏色', type: 'color', default: '#000000', group: 'main' }],
+      draw(ctx, pr, W, H, p) {
+        const r = Math.hypot(W, H) / 2 * ease('easeInOut', Math.abs(2 * p - 1));
+        ctx.fillStyle = rgba(pr.color);
+        ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.arc(W / 2, H / 2, Math.max(0.1, r), 0, Math.PI * 2, true); ctx.fill();
+      },
+    },
+    blinds: {
+      label: '百葉窗', props: [{ key: 'color', label: '顏色', type: 'color', default: '#000000', group: 'main' },
+        { key: 'count', label: '葉片數', type: 'number', min: 2, max: 40, step: 1, default: 10, group: 'main' }],
+      draw(ctx, pr, W, H, p) {
+        const k = ease('easeInOut', 1 - Math.abs(2 * p - 1));
+        const n = Math.max(2, Math.round(pr.count)), band = H / n;
+        ctx.fillStyle = rgba(pr.color);
+        for (let i = 0; i < n; i++) ctx.fillRect(0, i * band, W, band * k + 0.5);
+      },
+    },
+    zoom: {
+      label: '衝擊縮放', props: [{ key: 'amount', label: '強度', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, group: 'main' }],
+      draw(ctx, pr, W, H, p) {
+        const k = Math.sin(Math.PI * p);
+        if (k < 0.001) return;
+        const src = snapshot(ctx, W, H), s = 1 + k * 0.4 * pr.amount;
+        ctx.filter = `blur(${k * 14 * pr.amount}px)`;
+        ctx.drawImage(src, W / 2 - (W * s) / 2, H / 2 - (H * s) / 2, W * s, H * s);
+        ctx.filter = 'none';
+        ctx.globalAlpha = k * 0.6 * pr.amount; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      },
+    },
+  };
+
+  for (const [name, fx] of Object.entries(EFFECTS)) {
+    registerType('fx_' + name, {
+      label: fx.label, category: 'effect', screen: true, props: fx.props,
+      draw(p, pr, env) { fx.draw(p.drawingContext, pr, env.W, env.H, env.st.alpha, env.lt, env.clip.duration, env.t - env.clip.start); },
+    });
+  }
+  for (const [name, tr] of Object.entries(TRANSITIONS)) {
+    registerType('tr_' + name, {
+      label: tr.label, category: 'transition', screen: true, props: tr.props,
+      draw(p, pr, env) { tr.draw(p.drawingContext, pr, env.W, env.H, clamp((env.t - env.clip.start) / Math.max(0.01, env.clip.duration), 0, 1)); },
+    });
+  }
+})();
+
+</script>
+<script>
+// Synth voices ported from the p5-comfyui-animation sound.js kit so legacy SCORE objects play unchanged.
+// Every voice: (ctx, destinationNode, startTime, ...args)
+(function () {
+  const P5M = window.P5M;
+
+  const midiToHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  function makeReverb(ctx, seconds = 2.6) {
+    const len = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    }
+    const conv = ctx.createConvolver();
+    conv.buffer = buf;
+    return conv;
+  }
+
+  function envGain(ctx, dest, t, attack, peak, decay) {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    g.connect(dest);
+    return g;
+  }
+
+  function noiseSource(ctx, t, len) {
+    if (!ctx._noise) {
+      const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      ctx._noise = buf;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = ctx._noise;
+    src.loop = true;
+    src.start(t, Math.random() * 1.5);
+    src.stop(t + len + 0.1);
+    return src;
+  }
+
+  function biquad(ctx, type, freq, q = 1) {
+    const f = ctx.createBiquadFilter();
+    f.type = type;
+    f.frequency.value = freq;
+    f.Q.value = q;
+    return f;
+  }
+
+  // ---------- tonal voices ----------
+  function pluck(ctx, bus, t, midi, durSec = 1, vol = 0.22) {
+    const f = midiToHz(midi);
+    const decay = Math.max(1.2, durSec * 1.6);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(f * 8, t);
+    lp.frequency.exponentialRampToValueAtTime(f * 1.5, t + decay);
+    const g = envGain(ctx, lp, t, 0.005, vol, decay);
+    lp.connect(bus);
+    [[1, 'triangle', 1], [2, 'sine', 0.35], [3, 'sine', 0.12]].forEach(([mult, type, amp]) => {
+      const o = ctx.createOscillator();
+      const og = ctx.createGain();
+      o.type = type;
+      o.frequency.value = f * mult;
+      og.gain.value = amp;
+      o.connect(og).connect(g);
+      o.start(t);
+      o.stop(t + decay + 0.1);
+    });
+  }
+
+  function pad(ctx, bus, t, notes, len, vol = 0.045) {
+    notes.forEach((m) => {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = midiToHz(m);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(vol, t + 0.9);
+      g.gain.setValueAtTime(vol, t + len - 0.6);
+      g.gain.linearRampToValueAtTime(0.0001, t + len + 0.4);
+      o.connect(g).connect(bus);
+      o.start(t);
+      o.stop(t + len + 0.5);
+    });
+  }
+
+  function chime(ctx, bus, t, vol = 0.08) {
+    [1568, 2349, 3136].forEach((f, i) => {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f;
+      o.connect(envGain(ctx, bus, t + i * 0.06, 0.004, vol / (i + 1), 2.2));
+      o.start(t + i * 0.06);
+      o.stop(t + 2.5);
+    });
+  }
+
+  function glissando(ctx, bus, t, notes = [60, 62, 64, 67, 69, 72, 74, 76, 79, 81], step = 0.045, vol = 0.1) {
+    notes.forEach((m, i) => pluck(ctx, bus, t + i * step, m, 0.6, vol));
+  }
+
+  function shimmer(ctx, bus, t, len = 2, vol = 0.03) {
+    for (let i = 0; i < 14; i++) {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = 2000 + Math.random() * 3000;
+      const s = t + (i / 14) * len * 0.7;
+      o.connect(envGain(ctx, bus, s, 0.01, vol, 0.5));
+      o.start(s);
+      o.stop(s + 0.6);
+    }
+  }
+
+  function pop(ctx, bus, t, vol = 0.16) {
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(520, t);
+    o.frequency.exponentialRampToValueAtTime(1300, t + 0.07);
+    o.connect(envGain(ctx, bus, t, 0.004, vol, 0.12));
+    o.start(t);
+    o.stop(t + 0.2);
+  }
+
+  function thud(ctx, bus, t, vol = 0.4, pitch = 1) {
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(190 * pitch, t);
+    o.frequency.exponentialRampToValueAtTime(80 * pitch, t + 0.12);
+    o.connect(envGain(ctx, bus, t, 0.003, vol, 0.18));
+    o.start(t);
+    o.stop(t + 0.25);
+    const n = noiseSource(ctx, t, 0.06);
+    n.connect(biquad(ctx, 'bandpass', 1400 * pitch, 3)).connect(envGain(ctx, bus, t, 0.002, vol * 0.5, 0.04));
+  }
+
+  // ---------- creature voices ----------
+  function meow(ctx, dest, t, pitch = 1, dur = 0.75) {
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(430 * pitch, t);
+    o.frequency.linearRampToValueAtTime(820 * pitch, t + dur * 0.3);
+    o.frequency.linearRampToValueAtTime(700 * pitch, t + dur * 0.6);
+    o.frequency.linearRampToValueAtTime(420 * pitch, t + dur);
+    const vib = ctx.createOscillator();
+    const vibAmt = ctx.createGain();
+    vib.frequency.value = 7;
+    vibAmt.gain.value = 14 * pitch;
+    vib.connect(vibAmt).connect(o.frequency);
+    const formant = ctx.createBiquadFilter();
+    formant.type = 'bandpass';
+    formant.Q.value = 2.5;
+    formant.frequency.setValueAtTime(800, t);
+    formant.frequency.linearRampToValueAtTime(1700, t + dur * 0.35);
+    formant.frequency.linearRampToValueAtTime(950, t + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + 0.06);
+    g.gain.setValueAtTime(0.5, t + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(formant).connect(g).connect(dest);
+    o.start(t);
+    vib.start(t);
+    o.stop(t + dur + 0.05);
+    vib.stop(t + dur + 0.05);
+  }
+
+  function purr(ctx, dest, t, len = 3) {
+    const src = noiseSource(ctx, t, len);
+    const flutter = ctx.createGain();
+    flutter.gain.value = 0.5;
+    const lfo = ctx.createOscillator();
+    const lfoAmt = ctx.createGain();
+    lfo.frequency.value = 25;
+    lfoAmt.gain.value = 0.5;
+    lfo.connect(lfoAmt).connect(flutter.gain);
+    const breath = ctx.createGain();
+    breath.gain.setValueAtTime(0.0001, t);
+    for (let s = t; s < t + len; s += 1.6) {
+      breath.gain.linearRampToValueAtTime(0.9, s + 0.72);
+      breath.gain.linearRampToValueAtTime(0.25, s + 1.6);
+    }
+    breath.gain.linearRampToValueAtTime(0.0001, t + len);
+    src.connect(biquad(ctx, 'lowpass', 260)).connect(flutter).connect(breath).connect(dest);
+    lfo.start(t);
+    lfo.stop(t + len + 0.1);
+  }
+
+  function sniff(ctx, dest, t, count = 3, vol = 0.25) {
+    for (let i = 0; i < count; i++) {
+      const s = t + i * 0.16;
+      noiseSource(ctx, s, 0.12).connect(biquad(ctx, 'bandpass', 2600, 2))
+        .connect(envGain(ctx, dest, s, 0.02, vol, 0.08));
+    }
+  }
+
+  function crickets(ctx, dest, t, len = 10, vol = 0.02) {
+    for (let s = t; s < t + len; s += 0.8 + Math.random() * 0.5) {
+      for (let k = 0; k < 3; k++) {
+        const o = ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = 4300;
+        const p = s + k * 0.055;
+        o.connect(envGain(ctx, dest, p, 0.004, vol, 0.035));
+        o.start(p);
+        o.stop(p + 0.05);
+      }
+    }
+  }
+
+  // ---------- noise effects ----------
+  function whoosh(ctx, dest, t, dur = 0.6, up = true, vol = 0.25) {
+    const bp = biquad(ctx, 'bandpass', up ? 400 : 3000, 1.5);
+    bp.frequency.exponentialRampToValueAtTime(up ? 3000 : 400, t + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + dur * 0.6);
+    g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    noiseSource(ctx, t, dur).connect(bp).connect(g).connect(dest);
+  }
+
+  function strike(ctx, dest, t, vol = 0.3) {
+    const bp = biquad(ctx, 'bandpass', 5000, 1.2);
+    bp.frequency.exponentialRampToValueAtTime(1500, t + 0.25);
+    noiseSource(ctx, t, 0.3).connect(bp).connect(envGain(ctx, dest, t, 0.005, vol, 0.25));
+  }
+
+  function sizzle(ctx, dest, t, len = 5, vol = 0.05) {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.8);
+    g.gain.setValueAtTime(vol, t + len - 0.8);
+    g.gain.linearRampToValueAtTime(0.0001, t + len);
+    noiseSource(ctx, t, len).connect(biquad(ctx, 'highpass', 3500)).connect(g).connect(dest);
+  }
+
+  function crackle(ctx, dest, t, len = 3, density = 6, vol = 0.18) {
+    const n = Math.floor(len * density);
+    for (let i = 0; i < n; i++) {
+      const s = t + Math.random() * len;
+      const a = vol * (0.3 + Math.random() * 0.7);
+      noiseSource(ctx, s, 0.03).connect(biquad(ctx, 'bandpass', 1500 + Math.random() * 2500, 2))
+        .connect(envGain(ctx, dest, s, 0.001, a, 0.02 + Math.random() * 0.03));
+    }
+  }
+
+  function roll(ctx, dest, t, len = 1.5, vol = 0.3) {
+    const am = ctx.createGain();
+    am.gain.value = 0.5;
+    const lfo = ctx.createOscillator();
+    const lfoAmt = ctx.createGain();
+    lfo.frequency.value = 9;
+    lfoAmt.gain.value = 0.5;
+    lfo.connect(lfoAmt).connect(am.gain);
+    lfo.start(t);
+    lfo.stop(t + len + 0.1);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.2);
+    g.gain.setValueAtTime(vol, t + len * 0.7);
+    g.gain.linearRampToValueAtTime(0.0001, t + len);
+    noiseSource(ctx, t, len).connect(biquad(ctx, 'lowpass', 380)).connect(am).connect(g).connect(dest);
+  }
+
+  P5M.voices = {
+    midiToHz, makeReverb, envGain, noiseSource, biquad, pad,
+    VOICES: { pluck, chime, glissando, shimmer, pop, thud, meow, purr, sniff, crickets, whoosh, strike, sizzle, crackle, roll },
+    MUSIC_VOICES: new Set(['pluck', 'chime', 'glissando', 'shimmer']),
+  };
+})();
+
+</script>
+<script>
+// Audio clip types (music score, synth sound effect, audio file) and the playback engine.
+// Each play() builds a fresh AudioContext and schedules every audible clip against it; stop() closes it.
+// Project time T maps to context time: ctxStart + (T - fromT).
+(function () {
+  const P5M = window.P5M;
+  const { registerType, hash, clamp } = P5M;
+  const V = P5M.voices;
+
+  // ---------- mood presets -> generated SCORE (same shape as legacy sound.js scores) ----------
+  const MOODS = {
+    warm: { label: '溫馨', bpm: 84, bpc: 4, density: 0.55, chords: { F: [53, 57, 60], C: [48, 52, 55], Dm: [50, 53, 57], Bb: [46, 50, 53] },
+      prog: ['F', 'C', 'Dm', 'Bb'], scale: [65, 67, 69, 72, 74, 77, 79, 81] },
+    festive: { label: '喜慶', bpm: 108, bpc: 4, density: 0.8, chime: 4, chords: { C: [48, 52, 55], Am: [45, 48, 52], F: [41, 45, 48], G: [43, 47, 50] },
+      prog: ['C', 'Am', 'F', 'G'], scale: [72, 74, 76, 79, 81, 84, 86, 88] },
+    calm: { label: '寧靜', bpm: 66, bpc: 8, density: 0.22, chords: { D: [50, 54, 57], Bm: [47, 50, 54], G: [43, 47, 50], A: [45, 49, 52] },
+      prog: ['D', 'Bm', 'G', 'A'], scale: [74, 76, 78, 81, 83, 86] },
+    romantic: { label: '浪漫', bpm: 78, bpc: 4, density: 0.45, chords: { Fmaj7: [53, 57, 60, 64], Em7: [52, 55, 59, 62], Dm7: [50, 53, 57, 60], Cmaj7: [48, 52, 55, 59] },
+      prog: ['Fmaj7', 'Em7', 'Dm7', 'Cmaj7'], scale: [72, 74, 76, 77, 79, 81, 84] },
+    happy: { label: '歡樂', bpm: 124, bpc: 4, density: 0.9, chords: { C: [48, 52, 55], G: [43, 47, 50], Am: [45, 48, 52], F: [41, 45, 48] },
+      prog: ['C', 'G', 'Am', 'F'], scale: [72, 74, 76, 79, 81, 84] },
+    mystery: { label: '神秘', bpm: 72, bpc: 4, density: 0.35, chords: { Am: [45, 48, 52], F: [41, 45, 48], Dm: [50, 53, 57], E: [40, 44, 47] },
+      prog: ['Am', 'F', 'Dm', 'E'], scale: [69, 71, 72, 74, 76, 77, 80, 81] },
+  };
+
+  const scoreCache = new Map();
+  function moodScore(name, seconds, seed = 1) {
+    const m = MOODS[name] || MOODS.warm;
+    const beat = 60 / m.bpm;
+    const nChords = Math.max(1, Math.ceil(seconds / (m.bpc * beat)));
+    const key = name + '|' + nChords + '|' + seed;
+    if (scoreCache.has(key)) return scoreCache.get(key);
+    const progression = [...Array(nChords)].map((_, i) => m.prog[i % m.prog.length]);
+    const melody = [];
+    let idx = Math.floor(m.scale.length / 2);
+    for (let b = 0; b < nChords * m.bpc; b++) {
+      const strong = b % m.bpc === 0;
+      if (hash(b, seed) < m.density * (strong ? 1.2 : 0.75)) {
+        idx = clamp(idx + Math.round((hash(b + 500, seed) - 0.5) * 4), 0, m.scale.length - 1);
+        melody.push([b, m.scale[idx], strong ? 2 : 1]);
+      }
+      if (m.density > 0.7 && hash(b + 900, seed) < m.density - 0.5) {
+        const j = clamp(idx + (hash(b + 1300, seed) < 0.5 ? 1 : -1), 0, m.scale.length - 1);
+        melody.push([b + 0.5, m.scale[j], 0.5]);
+      }
+    }
+    const cues = [[0, 'shimmer', 2, 0.02]];
+    if (m.chime) for (let c = 0; c < nChords; c += m.chime) cues.push([c * m.bpc * beat, 'chime', 0.05]);
+    const score = { bpm: m.bpm, beatsPerChord: m.bpc, chords: m.chords, progression, melody, cues };
+    scoreCache.set(key, score);
+    return score;
+  }
+
+  // ---------- sound effect catalogue: default clip length and how clip props map to voice args ----------
+  // Volume is applied by the clip lane, so args carry only the voice's own base level.
+  const SFX = {
+    pop: { label: '啵', dur: 0.3, args: () => [] },
+    thud: { label: '咚（敲擊）', dur: 0.4, args: (pr) => [0.4, pr.pitch] },
+    chime: { label: '叮（鈴聲）', dur: 2.5, music: true, args: () => [] },
+    glissando: { label: '上行琶音', dur: 1, music: true, args: () => [] },
+    shimmer: { label: '閃亮音', dur: 2, music: true, args: (pr, len) => [len] },
+    pluck: { label: '撥弦單音', dur: 1.5, music: true, args: (pr, len) => [pr.note, len] },
+    whoosh: { label: '咻（風聲）', dur: 0.6, args: (pr, len) => [len, pr.up] },
+    strike: { label: '擦火柴', dur: 0.4, args: () => [] },
+    meow: { label: '貓叫', dur: 0.8, args: (pr, len) => [pr.pitch, Math.min(len, 3)] },
+    purr: { label: '呼嚕', dur: 3, args: (pr, len) => [len] },
+    sniff: { label: '嗅聞', dur: 0.6, args: (pr) => [Math.max(1, Math.round(pr.count))] },
+    crickets: { label: '蟲鳴', dur: 6, args: (pr, len) => [len] },
+    sizzle: { label: '滋滋聲', dur: 4, args: (pr, len) => [Math.max(len, 1.6)] },
+    crackle: { label: '劈啪（鞭炮）', dur: 3, args: (pr, len) => [len, pr.density] },
+    roll: { label: '滾動隆隆', dur: 1.5, args: (pr, len) => [len] },
+  };
+  // Continuous textures that can start mid-way when playback begins inside the clip
+  const RESUMABLE = new Set(['shimmer', 'purr', 'crickets', 'sizzle', 'crackle', 'roll']);
+
+  const volumeProp = { key: 'volume', label: '音量', type: 'range', min: 0, max: 2, step: 0.01, default: 1, group: 'main' };
+  const fadeInProp = { key: 'fadeIn', label: '淡入（秒）', type: 'number', min: 0, step: 0.1, default: 0, group: 'main' };
+  const fadeOutProp = { key: 'fadeOut', label: '淡出（秒）', type: 'number', min: 0, step: 0.1, default: 0, group: 'main' };
+
+  registerType('music', {
+    label: '配樂', category: 'audio', audio: true,
+    props: [
+      { key: 'preset', label: '曲風', type: 'select', default: 'warm', group: 'main',
+        options: [...Object.entries(MOODS).map(([k, v]) => [k, v.label]), ['score', '匯入的樂譜']] },
+      { key: 'seed', label: '旋律變化', type: 'number', step: 1, default: 1, group: 'main', when: (pr) => pr.preset !== 'score' },
+      { ...volumeProp, default: 0.8 }, fadeInProp, { ...fadeOutProp, default: 1.5 },
+    ],
+    schedule(eng, clip, pr, lane) {
+      const score = pr.preset === 'score' ? pr.score : moodScore(pr.preset, (clip.offset || 0) + clip.duration, pr.seed);
+      if (score) scheduleScore(eng, clip, score, lane);
+    },
+  });
+
+  registerType('sfx', {
+    label: '音效', category: 'audio', audio: true,
+    props: [
+      { key: 'voice', label: '音效', type: 'select', default: 'pop', group: 'main', options: Object.entries(SFX).map(([k, v]) => [k, v.label]) },
+      { key: 'pitch', label: '音高', type: 'range', min: 0.4, max: 2.5, step: 0.01, default: 1, group: 'main', when: (pr) => pr.voice === 'meow' || pr.voice === 'thud' },
+      { key: 'note', label: '音符（MIDI）', type: 'number', min: 24, max: 108, step: 1, default: 72, group: 'main', when: (pr) => pr.voice === 'pluck' },
+      { key: 'up', label: '上升', type: 'bool', default: true, group: 'main', when: (pr) => pr.voice === 'whoosh' },
+      { key: 'count', label: '次數', type: 'number', min: 1, max: 12, step: 1, default: 3, group: 'main', when: (pr) => pr.voice === 'sniff' },
+      { key: 'density', label: '密度（次/秒）', type: 'number', min: 0.5, max: 40, step: 0.5, default: 6, group: 'main', when: (pr) => pr.voice === 'crackle' },
+      volumeProp,
+    ],
+    schedule(eng, clip, pr, lane) {
+      const sfx = SFX[pr.voice];
+      if (!sfx) return;
+      const T0 = clip.start - (clip.offset || 0); // when the sound itself begins
+      const from = Math.max(clip.start, eng.fromT); // audible window is [start, start + duration) only
+      if (T0 < from && !RESUMABLE.has(pr.voice)) return;
+      const at = Math.max(T0, from), len = clip.start + clip.duration - at;
+      if (len < 0.1) return;
+      V.VOICES[pr.voice](eng.ctx, sfx.music ? lane.music : lane.sfx, eng.time(at), ...sfx.args(pr, len));
+    },
+  });
+
+  registerType('audiofile', {
+    label: '音訊檔', category: 'audio', audio: true,
+    props: [{ key: 'asset', label: '音訊', type: 'asset', accept: 'audio', group: 'main' }, volumeProp, fadeInProp, fadeOutProp],
+    schedule(eng, clip, pr, lane) {
+      const buf = eng.buffers.get(pr.asset);
+      if (!buf) return;
+      const skip = Math.max(0, eng.fromT - clip.start);
+      const offset = (clip.offset || 0) + skip;
+      const len = clip.duration - skip;
+      if (len <= 0.01 || offset >= buf.duration) return;
+      const src = eng.ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(lane.sfx);
+      src.start(eng.time(clip.start + skip), offset, len);
+    },
+  });
+
+  // Score time st maps to project time clip.start + (st - offset); only [offset, offset + duration) is audible
+  function scheduleScore(eng, clip, score, lane) {
+    const { ctx } = eng;
+    const beat = 60 / score.bpm, bpc = score.beatsPerChord || 4;
+    const a = clip.offset || 0, b = a + clip.duration;
+    const proj = (st) => clip.start + (st - a);
+    const due = (st) => st >= a - 0.05 && st < b && proj(st) >= eng.fromT - 0.02;
+    (score.progression || []).forEach((name, i) => {
+      const st = i * bpc * beat, len = bpc * beat, notes = score.chords[name];
+      if (!notes || st >= b || st + len <= a) return;
+      const T = Math.max(proj(st), eng.fromT);
+      const remain = proj(st) + len - T;
+      if (remain > 0.3) V.pad(ctx, lane.music, eng.time(T), notes, remain);
+    });
+    (score.melody || []).forEach(([bt, midi, dur]) => {
+      const st = bt * beat;
+      if (due(st)) V.VOICES.pluck(ctx, lane.music, eng.time(proj(st)), midi, dur * beat);
+    });
+    (score.cues || []).forEach(([sec, voice, ...args]) => {
+      const fn = V.VOICES[voice];
+      if (!fn) { console.warn('未知的音效名稱：' + voice); return; }
+      if (due(sec)) fn(ctx, V.MUSIC_VOICES.has(voice) ? lane.music : lane.sfx, eng.time(proj(sec)), ...args);
+    });
+    // legacy SCORE.fadeOut faded the whole master in sound.js; here it fades this clip's lanes
+    if (score.fadeOut) for (const g of lane.fades) automate(eng, g, [[proj(score.fadeOut[0]), 1], [proj(score.fadeOut[1]), 0]]);
+  }
+
+  // Piecewise-linear automation in project time, starting from its value at the play head
+  function automate(eng, param, points) {
+    const valueAt = (T) => {
+      if (T <= points[0][0]) return points[0][1];
+      for (let i = 1; i < points.length; i++) {
+        const [t1, v1] = points[i], [t0, v0] = points[i - 1];
+        if (T <= t1) return t1 > t0 ? v0 + ((v1 - v0) * (T - t0)) / (t1 - t0) : v1;
+      }
+      return points[points.length - 1][1];
+    };
+    param.setValueAtTime(valueAt(eng.fromT), eng.ctxStart);
+    for (const [T, v] of points) if (T > eng.fromT) param.linearRampToValueAtTime(v, eng.time(T));
+  }
+
+  // Two lanes per clip (music -> music bus, sfx -> sfx bus), each gated by the clip's volume and fades
+  // and hard-cut at the clip edges; `fades` are extra gains for a legacy score's fadeOut.
+  function clipLanes(eng, clip, pr, musicBus, sfxBus) {
+    const vol = pr.volume ?? 1;
+    const s = clip.start, e = clip.start + clip.duration;
+    const fi = Math.max(0.005, Math.min(pr.fadeIn || 0, clip.duration / 2));
+    const fo = Math.max(0.005, Math.min(pr.fadeOut || 0, clip.duration / 2));
+    const envelope = [[s, 0], [s + fi, vol], [e - fo, vol], [e, 0]];
+    const lane = (dest) => {
+      const gate = eng.ctx.createGain(), fade = eng.ctx.createGain();
+      gate.connect(fade).connect(dest);
+      automate(eng, gate.gain, envelope);
+      return { gate, fade: fade.gain };
+    };
+    const m = lane(musicBus), x = lane(sfxBus);
+    return { music: m.gate, sfx: x.gate, fades: [m.fade, x.fade] };
+  }
+
+  // ---------- engine ----------
+  const engine = {
+    session: null,
+
+    // Plays every unmuted audio track from project time fromT. opts.record adds a MediaStream output (session.stream).
+    async play(project, fromT, opts = {}) {
+      engine.stop();
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // Freeze the clock while scheduling (can take a few hundred ms) so the first notes are not late
+      const hold = ctx.suspend().catch(() => {});
+      const eng = {
+        ctx, fromT, ctxStart: ctx.currentTime + 0.12, perf0: performance.now(), buffers: new Map(), stream: null,
+        time(T) { return Math.max(0, this.ctxStart + (T - fromT)); },
+        // Current project time; falls back to the wall clock when the context is not running (autoplay blocked)
+        now() {
+          if (ctx.state === 'running') return fromT + Math.max(0, ctx.currentTime - this.ctxStart);
+          return fromT + Math.max(0, (performance.now() - this.perf0) / 1000 - 0.12);
+        },
+        stop() { if (ctx.state !== 'closed') ctx.close().catch(() => {}); },
+      };
+      engine.session = eng;
+
+      const master = ctx.createGain();
+      master.gain.value = project.settings.volume ?? 1;
+      master.connect(ctx.destination);
+      if (opts.record) {
+        const dest = ctx.createMediaStreamDestination();
+        master.connect(dest);
+        eng.stream = dest.stream;
+      }
+      // routing from sound.js: music bus fully into reverb, sfx with a 25% send
+      const reverb = V.makeReverb(ctx);
+      const wet = ctx.createGain(); wet.gain.value = 0.35;
+      reverb.connect(wet).connect(master);
+      const musicBus = ctx.createGain(); musicBus.gain.value = 0.8;
+      musicBus.connect(master); musicBus.connect(reverb);
+      const sfxBus = ctx.createGain(); sfxBus.connect(master);
+      const send = ctx.createGain(); send.gain.value = 0.25;
+      sfxBus.connect(send).connect(reverb);
+
+      const clips = [];
+      for (const tr of project.tracks) {
+        if (tr.kind !== 'audio' || tr.muted) continue;
+        for (const c of tr.clips) {
+          const def = P5M.types[c.type];
+          if (def && def.schedule && c.start + c.duration > fromT) clips.push(c);
+        }
+      }
+      await Promise.all(clips.filter((c) => c.type === 'audiofile' && c.props.asset).map(async (c) => {
+        const buf = await P5M.assets.audioBuffer(project.assets[c.props.asset]);
+        if (buf) eng.buffers.set(c.props.asset, buf);
+      }));
+      if (engine.session !== eng) return eng; // stopped or restarted while decoding
+      for (const c of clips) {
+        const pr = P5M.resolveProps(c, 0, project.settings);
+        try { P5M.types[c.type].schedule(eng, c, pr, clipLanes(eng, c, pr, musicBus, sfxBus)); }
+        catch (err) { console.error('音訊排程失敗', c.type, c.id, err); }
+      }
+      await hold;
+      if (engine.session !== eng) return eng;
+      eng.perf0 = performance.now();
+      ctx.resume().catch(() => {}); // not awaited: stays pending forever when autoplay is blocked
+      return eng;
+    },
+
+    stop() {
+      if (engine.session) { engine.session.stop(); engine.session = null; }
+    },
+
+    // Audition one audio clip from its beginning (library click, inspector preview)
+    preview(clip, project) {
+      const mini = { settings: project.settings, assets: project.assets, tracks: [{ kind: 'audio', clips: [{ ...clip, start: 0 }] }] };
+      return engine.play(mini, 0);
+    },
+  };
+
+  P5M.audio = engine;
+  P5M.music = { MOODS, moodScore };
+  P5M.sfxCatalog = SFX;
+})();
+
+</script>
+<script>
+// Project model helpers and the frame renderer: renderFrame(p, project, t) paints one frame as a pure function of t.
+//
+// project = {
+//   format: 'p5maker', version: 1,
+//   settings: { width, height, fps, duration, background, volume },
+//   assets:   { [id]: { id, kind: 'image' | 'audio' | 'legacy', name, src, w?, h?, ... } },
+//   camera:   { props: { x, y, zoom, rotation, shake }, keys: { [prop]: [{ t, v, e }] } },   // keys in project seconds
+//   tracks:   [{ id, name, kind: 'visual' | 'audio', hidden, muted, locked, followCamera, clips: [clip] }],  // index 0 = top
+// }
+// clip = { id, type, name, start, duration, offset, props, keys, anim, blend }
+(function () {
+  const P5M = window.P5M;
+  const { types, clamp, resolveProps, localTime, isActive, sampleKeys, noise, uid } = P5M;
+
+  const CAMERA_DEFAULTS = (s) => ({ x: s.width / 2, y: s.height / 2, zoom: 1, rotation: 0, shake: 0 });
+
+  function newProject(opts = {}) {
+    const settings = { width: 1280, height: 720, fps: 30, duration: 10, background: '#101018', volume: 1, ...opts };
+    return {
+      format: 'p5maker', version: 1, settings, assets: {},
+      camera: { props: CAMERA_DEFAULTS(settings), keys: {} },
+      tracks: [
+        { id: uid('tr'), name: '軌道 1', kind: 'visual', clips: [] },
+        { id: uid('tr'), name: '音訊 1', kind: 'audio', clips: [] },
+      ],
+    };
+  }
+
+  // Fill missing fields so older or hand-written (Claude-made) JSON renders; returns a new object
+  function normalizeProject(src) {
+    const settings = { width: 1280, height: 720, fps: 30, duration: 10, background: '#101018', volume: 1, ...(src.settings || {}) };
+    const tracks = (src.tracks || []).map((tr, i) => ({
+      id: tr.id || uid('tr'), name: tr.name || '軌道 ' + (i + 1), kind: tr.kind === 'audio' ? 'audio' : 'visual',
+      hidden: !!tr.hidden, muted: !!tr.muted, locked: !!tr.locked, followCamera: tr.followCamera !== false,
+      clips: (tr.clips || []).map((c) => ({
+        id: c.id || uid('c'), type: c.type, name: c.name || '', start: +c.start || 0, duration: Math.max(0.05, +c.duration || 1),
+        offset: +c.offset || 0, props: { ...(c.props || {}) }, keys: { ...(c.keys || {}) }, anim: c.anim ? { ...c.anim } : {}, blend: c.blend || 'source-over',
+      })),
+    }));
+    const cam = src.camera || {};
+    const assets = {};
+    for (const [id, a] of Object.entries(src.assets || {})) assets[id] = { ...a, name: a.name || id };
+    return {
+      format: 'p5maker', version: 1, title: src.title || '', settings, assets,
+      camera: { props: { ...CAMERA_DEFAULTS(settings), ...(cam.props || {}) }, keys: { ...(cam.keys || {}) } },
+      tracks,
+    };
+  }
+
+  // Latest clip end across all tracks (the editor can extend settings.duration to this)
+  function contentEnd(project) {
+    let end = 0;
+    for (const tr of project.tracks) for (const c of tr.clips) end = Math.max(end, c.start + c.duration);
+    return end;
+  }
+
+  function cameraAt(project, t) {
+    const cam = project.camera || { props: {}, keys: {} };
+    const out = { ...CAMERA_DEFAULTS(project.settings), ...cam.props };
+    for (const k in cam.keys) if (cam.keys[k] && cam.keys[k].length) out[k] = sampleKeys(cam.keys[k], t);
+    return out;
+  }
+
+  function cameraMatrix(project, t) {
+    const { width: W, height: H } = project.settings;
+    const c = cameraAt(project, t);
+    let sx = 0, sy = 0;
+    if (c.shake > 0) { sx = (noise(t * 9, 0, 0, 7) - 0.5) * 2 * c.shake; sy = (noise(0, t * 9, 0, 11) - 0.5) * 2 * c.shake; }
+    return new DOMMatrix().translate(W / 2, H / 2).scale(c.zoom).rotate(-c.rotation).translate(-c.x + sx, -c.y + sy);
+  }
+
+  function filterString(pr, extraBlur) {
+    const parts = [];
+    const blur = (pr.blur || 0) + (extraBlur || 0);
+    if (blur > 0.05) parts.push(`blur(${blur.toFixed(2)}px)`);
+    if (pr.brightness !== undefined && pr.brightness !== 1) parts.push(`brightness(${pr.brightness})`);
+    if (pr.contrast !== undefined && pr.contrast !== 1) parts.push(`contrast(${pr.contrast})`);
+    if (pr.saturate !== undefined && pr.saturate !== 1) parts.push(`saturate(${pr.saturate})`);
+    if (pr.hue) parts.push(`hue-rotate(${pr.hue}deg)`);
+    return parts.length ? parts.join(' ') : 'none';
+  }
+
+  function clipReveal(ctx, rv, b) {
+    const p = clamp(rv.p, 0, 1);
+    ctx.beginPath();
+    if (rv.dir === 'iris') ctx.arc(0, 0, Math.hypot(b.w, b.h) / 2 * p, 0, Math.PI * 2);
+    else if (rv.dir === 'left') ctx.rect(b.w / 2 - b.w * p, -b.h / 2, b.w * p, b.h);
+    else ctx.rect(-b.w / 2, -b.h / 2, b.w * p, b.h);
+    ctx.clip();
+  }
+
+  const warned = new Set();
+  function drawClip(p, def, pr, env) {
+    try { def.draw.call(def, p, pr, env); } catch (err) {
+      if (!warned.has(env.clip.id)) { warned.add(env.clip.id); console.error('圖層繪製失敗', env.clip.type, env.clip.id, err); }
+    }
+  }
+
+  // Chrome spends several ms per draw call while ctx.filter is set, so a clip that draws many shapes under a blur
+  // (particles, clouds, per-glyph text) took 200-900 ms a frame. Such clips are painted unfiltered into a
+  // frame-sized scratch canvas, then composited once with the filter and the clip's blend mode. Alpha is applied
+  // per shape inside the layer, as on the direct path, so overlaps look the same when the filter turns off.
+  let layer = null;
+  function drawFiltered(p, def, pr, env, filter, reveal, b) {
+    const ctx = p.drawingContext, r = p._renderer;
+    const c = layer || (layer = document.createElement('canvas'));
+    if (c.width !== ctx.canvas.width || c.height !== ctx.canvas.height) { c.width = ctx.canvas.width; c.height = ctx.canvas.height; }
+    const lc = c.getContext('2d');
+    lc.save();
+    lc.clearRect(0, 0, c.width, c.height);
+    lc.setTransform(ctx.getTransform());
+    lc.globalAlpha = ctx.globalAlpha;
+    if (reveal) clipReveal(ctx, reveal, b); // on ctx, so the filtered result is clipped as before
+    // types draw through p.drawingContext, and p5 calls (code clips) through the renderer: point both at the layer
+    const cached = [r._cachedFillStyle, r._cachedStrokeStyle];
+    p.drawingContext = r.drawingContext = lc;
+    r._cachedFillStyle = r._cachedStrokeStyle = undefined;
+    try { drawClip(p, def, pr, env); } finally {
+      p.drawingContext = r.drawingContext = ctx;
+      [r._cachedFillStyle, r._cachedStrokeStyle] = cached;
+    }
+    // aurora and fireworks switch to 'lighter' themselves; composite the layer the same way so they still add up
+    const op = lc.globalCompositeOperation;
+    lc.restore();
+    if (op !== 'source-over') ctx.globalCompositeOperation = op;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.filter = filter;
+    ctx.drawImage(c, 0, 0);
+  }
+
+  // Paints the frame at project time t. Returns hit boxes for visual clips, top-most last:
+  // [{ clipId, trackId, m: DOMMatrix (props transform, before in/out animation), w, h }]
+  function renderFrame(p, project, t, opts = {}) {
+    const { width: W, height: H, background } = project.settings;
+    const ctx = p.drawingContext;
+    const hits = [];
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.filter = 'none';
+    ctx.clearRect(0, 0, W, H);
+    if (background && background !== 'transparent') { ctx.fillStyle = P5M.rgba(background); ctx.fillRect(0, 0, W, H); }
+    const cam = cameraMatrix(project, t);
+    const ident = new DOMMatrix();
+
+    for (let ti = project.tracks.length - 1; ti >= 0; ti--) {
+      const tr = project.tracks[ti];
+      if (tr.kind === 'audio' || tr.hidden) continue;
+      if (opts.solo && opts.solo !== tr.id) continue;
+      for (const clip of tr.clips) {
+        if (!isActive(clip, t)) continue;
+        const def = types[clip.type];
+        if (!def || def.audio) continue;
+        const lt = localTime(clip, t);
+        const pr = resolveProps(clip, lt, project.settings);
+        const st = P5M.animState(clip, t, { W, H });
+        const env = { W, H, lt, t, st, clip, project, sx: 1, sy: 1 };
+
+        p.push();
+        if (def.screen) {
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          drawClip(p, def, pr, env);
+          p.pop();
+          continue;
+        }
+        const base = tr.followCamera === false ? ident : cam;
+        const m = base.translate(pr.x, pr.y).rotate(pr.rotation || 0).scale(pr.scale ?? 1);
+        const b = def.bounds ? def.bounds.call(def, pr, env) : null;
+        if (b) hits.push({ clipId: clip.id, trackId: tr.id, m, w: b.w, h: b.h });
+
+        const alpha = clamp(pr.opacity ?? 1, 0, 1) * st.alpha;
+        const fm = base.translate(pr.x + st.dx, pr.y + st.dy).rotate((pr.rotation || 0) + st.rot).scale((pr.scale ?? 1) * st.sx, (pr.scale ?? 1) * st.sy);
+        if (alpha <= 0.001 || Math.abs(fm.a * fm.d - fm.b * fm.c) < 1e-9) { p.pop(); continue; }
+        ctx.setTransform(fm);
+        ctx.globalAlpha = alpha;
+        ctx.globalCompositeOperation = clip.blend || 'source-over';
+        env.sx = Math.hypot(fm.a, fm.b);
+        env.sy = Math.hypot(fm.c, fm.d);
+        const filter = filterString(pr, st.blur);
+        const reveal = st.reveal && b ? st.reveal : null;
+        if (filter !== 'none') drawFiltered(p, def, pr, env, filter, reveal, b);
+        else {
+          ctx.filter = 'none';
+          if (reveal) clipReveal(ctx, reveal, b);
+          drawClip(p, def, pr, env);
+        }
+        p.pop();
+      }
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.filter = 'none';
+    return hits;
+  }
+
+  // Everything a p5 instance needs before the first frame: fonts, images, legacy iframes, 3D shaders
+  async function prepare(p, project) {
+    await P5M.assets.prepare(project);
+    const has3d = project.tracks.some((tr) => tr.clips.some((c) => c.type === 'shape3d'));
+    if (has3d && P5M.warm3d) P5M.warm3d(p, project.settings.width, project.settings.height);
+  }
+
+  Object.assign(P5M, { newProject, normalizeProject, contentEnd, cameraAt, cameraMatrix, renderFrame, prepare });
+})();
+
+</script>
+<script>
+// Real-time video export: plays the project once while MediaRecorder captures the canvas and the audio engine output.
+// Same approach as the legacy engine.js exportVideo (MP4 on Chrome/Edge 130+, WebM fallback).
+(function () {
+  const P5M = window.P5M;
+
+  const VIDEO_TYPES = [
+    'video/mp4;codecs=avc1.640028,mp4a.40.2',
+    'video/mp4;codecs=avc1,opus',
+    'video/mp4',
+    'video/webm;codecs=vp9,opus',
+    'video/webm',
+  ];
+
+  function pickType() {
+    if (typeof MediaRecorder === 'undefined') return null;
+    return VIDEO_TYPES.find((m) => MediaRecorder.isTypeSupported(m)) || null;
+  }
+
+  // opts: { canvas, project, from, to, render(t), onProgress(p), signal (AbortSignal) }
+  // Resolves { blob, type, ext }. The caller must pause its own draw loop while this runs.
+  async function recordVideo(opts) {
+    const type = pickType();
+    if (!type) throw new Error('此瀏覽器不支援影片錄製（請改用 Chrome 或 Edge）');
+    const { canvas, project, render, onProgress, signal } = opts;
+    const from = opts.from || 0;
+    const to = opts.to ?? project.settings.duration;
+    const fps = project.settings.fps || 30;
+
+    const session = await P5M.audio.play(project, from, { record: true });
+    const tracks = [...canvas.captureStream(fps).getVideoTracks()];
+    if (session.stream) tracks.push(...session.stream.getAudioTracks());
+    const stream = new MediaStream(tracks);
+    const recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8e6 });
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    const stopped = new Promise((resolve, reject) => {
+      recorder.onstop = resolve;
+      recorder.onerror = (e) => reject(e.error || new Error('錄製失敗'));
+    });
+    render(from);
+    recorder.start(1000);
+
+    // Timer-driven, not rAF: rAF stops when the window is covered, timers keep running while the tab is visible
+    let aborted = false;
+    await new Promise((resolve) => {
+      const tick = () => {
+        if (signal && signal.aborted) { aborted = true; resolve(); return; }
+        const t = Math.min(session.now(), to);
+        render(t);
+        if (onProgress) onProgress((t - from) / Math.max(0.001, to - from));
+        if (t >= to) setTimeout(resolve, 300); // short tail so the last frame lands
+        else setTimeout(tick, 1000 / fps);
+      };
+      tick();
+    });
+    recorder.stop();
+    await stopped;
+    stream.getTracks().forEach((tr) => tr.stop());
+    P5M.audio.stop();
+    if (aborted) return null;
+    return { blob: new Blob(chunks, { type: type.split(';')[0] }), type, ext: type.startsWith('video/mp4') ? 'mp4' : 'webm' };
+  }
+
+  function downloadBlob(blob, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  }
+
+  P5M.recorder = { VIDEO_TYPES, pickType, recordVideo, downloadBlob };
+})();
+
+</script>
+</head>
+<body>
+<div id="p5m-stage"></div>
+<button id="p5m-overlay" type="button" hidden><span>播放</span></button>
+<div id="p5m-bar">
+  <button id="p5m-play" type="button" title="播放／暫停（空白鍵）">▶</button>
+  <input id="p5m-seek" type="range" min="0" max="10" step="0.033" value="0" aria-label="播放位置">
+  <span id="p5m-time">00:00.00</span>
+  <button id="p5m-export" type="button" title="錄製並下載 MP4">下載影片</button>
+  <button id="p5m-full" type="button" title="全螢幕">⛶</button>
+</div>
+<div id="p5m-status" hidden></div>
+<script type="application/json" id="p5maker-project">{"format":"p5maker","version":1,"title":"Runtime 冒煙測試","settings":{"width":1280,"height":720,"fps":30,"duration":8,"background":"#101018"},"assets":{},"camera":{"props":{},"keys":{"zoom":[{"t":0,"v":1,"e":"easeInOut"},{"t":8,"v":1.15}]}},"tracks":[{"id":"t_fx","name":"特效","kind":"visual","clips":[{"id":"c_vig","type":"fx_vignette","start":0,"duration":8,"props":{}},{"id":"c_tr","type":"tr_wipe","start":3.6,"duration":0.8,"props":{}}]},{"id":"t_text","name":"文字","kind":"visual","clips":[{"id":"c_title","type":"text","start":0.3,"duration":7.5,"props":{"text":"中秋快樂","size":110,"y":300,"glow":18},"anim":{"in":{"type":"stamp","dur":1.2},"out":{"type":"fade"},"loop":{"type":"none"}}}]},{"id":"t_obj","name":"物件","kind":"visual","clips":[{"id":"c_box","type":"shape3d","start":0,"duration":8,"props":{"x":1020,"y":480,"size":160,"kind":"torus","material":"specular"}},{"id":"c_shape","type":"shape","start":0,"duration":8,"props":{"x":260,"y":480},"anim":{"in":{"type":"pop"},"loop":{"type":"float"}}},{"id":"c_code","type":"code","start":0,"duration":8,"props":{"x":640,"y":520,"scale":0.6}}]},{"id":"t_part","name":"粒子","kind":"visual","clips":[{"id":"c_lant","type":"particles","start":0,"duration":8,"props":{"preset":"lanterns","count":24,"size":26,"color":"#ffb84d","color2":"#ff7a2f"}},{"id":"c_fw","type":"particles","start":2,"duration":6,"props":{"preset":"fireworks","count":240,"size":4}}]},{"id":"t_bg","name":"背景","kind":"visual","followCamera":false,"clips":[{"id":"c_sky","type":"gen","start":0,"duration":8,"props":{"preset":"gradientSky"}},{"id":"c_moon","type":"gen","start":0,"duration":8,"props":{"preset":"moon","color":"#fff4d6","color2":"#ffd27a","w":400,"h":400,"x":980,"y":180}}]},{"id":"t_audio","name":"音訊","kind":"audio","clips":[{"id":"c_music","type":"music","start":0,"duration":8,"props":{"preset":"festive"}},{"id":"c_pop","type":"sfx","start":2,"duration":3,"props":{"voice":"crackle"}}]}]}</script>
+<script>
+// Standalone player for an exported project HTML.
+// Reads <script type="application/json" id="p5maker-project">, renders with P5M.renderFrame, plays audio with P5M.audio.
+// URL options: ?t=12.5 renders that frame frozen with no UI (baseline screenshots); ?autoplay=1 starts muted-safe playback.
+(function () {
+  const P5M = window.P5M;
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const frozenT = params.has('t') ? parseFloat(params.get('t')) : null;
+
+  const raw = $('p5maker-project');
+  const project = P5M.normalizeProject(JSON.parse(raw.textContent));
+  const { width: W, height: H, duration } = project.settings;
+
+  const api = { project, t: 0, playing: false, frameReady: false, ready: null, seek, play, pause, render: null };
+  window.P5M_PLAYER = api;
+
+  const stageEl = $('p5m-stage');
+  let pInst = null;
+  let session = null;
+  let raf = 0;
+  let exporting = false;
+
+  function render(t) {
+    api.t = t;
+    P5M.renderFrame(pInst, project, t);
+    const bar = $('p5m-seek');
+    if (bar && !bar.matches(':active')) bar.value = String(t);
+    const lbl = $('p5m-time');
+    if (lbl) lbl.textContent = P5M.fmtTime(t) + ' / ' + P5M.fmtTime(duration);
+  }
+  api.render = render;
+
+  function loop() {
+    if (!api.playing) return;
+    const t = session ? session.now() : api.t;
+    if (t >= duration) { render(duration); pause(); showOverlay('重新播放'); api.t = 0; return; }
+    render(t);
+    raf = requestAnimationFrame(loop);
+  }
+
+  async function play() {
+    if (api.playing || exporting) return;
+    hideOverlay();
+    api.playing = true;
+    setPlayIcon();
+    session = await P5M.audio.play(project, api.t >= duration ? 0 : api.t);
+    if (!api.playing) { P5M.audio.stop(); return; }
+    raf = requestAnimationFrame(loop);
+  }
+
+  function pause() {
+    api.playing = false;
+    cancelAnimationFrame(raf);
+    if (session) { api.t = Math.min(session.now(), duration); session = null; }
+    P5M.audio.stop();
+    setPlayIcon();
+  }
+
+  function seek(t) {
+    const wasPlaying = api.playing;
+    if (wasPlaying) pause();
+    render(P5M.clamp(t, 0, duration));
+    if (wasPlaying) play();
+  }
+
+  // ---------- UI ----------
+  function setPlayIcon() { const b = $('p5m-play'); if (b) b.textContent = api.playing ? '❚❚' : '▶'; }
+  function showOverlay(label) { const o = $('p5m-overlay'); o.querySelector('span').textContent = label; o.hidden = false; }
+  function hideOverlay() { $('p5m-overlay').hidden = true; }
+  function setStatus(msg) { const s = $('p5m-status'); s.textContent = msg || ''; s.hidden = !msg; }
+
+  async function exportVideo() {
+    if (exporting) return;
+    pause();
+    exporting = true;
+    document.body.classList.add('p5m-exporting');
+    try {
+      const res = await P5M.recorder.recordVideo({
+        canvas: pInst.canvas, project, from: 0, to: duration, render,
+        onProgress: (p) => setStatus('錄製中 ' + Math.round(p * 100) + '%（請保持此分頁在前景）'),
+      });
+      const name = (document.title || 'animation').replace(/[\\/:*?"<>|]/g, '_') + '.' + res.ext;
+      P5M.recorder.downloadBlob(res.blob, name);
+      setStatus('已下載 ' + name);
+      setTimeout(() => setStatus(''), 4000);
+    } catch (err) {
+      console.error('匯出影片失敗', err);
+      setStatus('匯出失敗：' + err.message);
+    } finally {
+      exporting = false;
+      document.body.classList.remove('p5m-exporting');
+      render(0);
+      showOverlay('播放');
+    }
+  }
+
+  function bindUI() {
+    const bar = $('p5m-seek');
+    bar.max = String(duration);
+    bar.step = String(1 / (project.settings.fps || 30));
+    bar.addEventListener('input', () => { if (api.playing) pause(); render(parseFloat(bar.value)); });
+    $('p5m-play').addEventListener('click', () => (api.playing ? pause() : play()));
+    $('p5m-overlay').addEventListener('click', play);
+    $('p5m-export').addEventListener('click', exportVideo);
+    $('p5m-full').addEventListener('click', () => {
+      if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {});
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') { e.preventDefault(); api.playing ? pause() : play(); }
+    });
+    let idle = 0;
+    document.addEventListener('pointermove', () => {
+      document.body.classList.remove('p5m-idle');
+      clearTimeout(idle);
+      idle = setTimeout(() => { if (api.playing) document.body.classList.add('p5m-idle'); }, 2200);
+    });
+  }
+
+  api.ready = new Promise((resolve) => {
+    pInst = new p5((p) => {
+      p.setup = async () => {
+        pInst = p; // p5 may run setup inside its constructor, before the assignment below returns
+        p.pixelDensity(1);
+        p.createCanvas(W, H);
+        p.noLoop();
+        P5M.assets.onReady = () => { if (!api.playing && !exporting) render(api.t); };
+        setStatus('載入中…');
+        await P5M.prepare(p, project);
+        setStatus('');
+        if (frozenT !== null) {
+          document.body.classList.add('p5m-frozen');
+          render(P5M.clamp(frozenT, 0, duration));
+          api.frameReady = true;
+          document.body.dataset.ready = '1';
+        } else {
+          bindUI();
+          render(0);
+          if (params.get('autoplay') === '1') play(); else showOverlay('播放');
+        }
+        resolve(api);
+      };
+    }, stageEl);
+  });
+})();
+
+</script>
+</body>
+</html>

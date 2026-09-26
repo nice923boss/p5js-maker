@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="generator" content="P5JS Maker">
+<title>__P5M_TITLE__</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  #p5m-stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  /* p5 writes inline px sizes; override so the canvas always letterboxes into the window */
+  #p5m-stage canvas { display: block; width: 100% !important; height: 100% !important; object-fit: contain; }
+  #p5m-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.28); cursor: pointer; border: 0; color: #fff; font: inherit; }
+  #p5m-overlay[hidden] { display: none; }
+  #p5m-overlay span { display: inline-flex; align-items: center; gap: 12px; padding: 16px 30px; border-radius: 999px; background: rgba(20,20,28,.72); font-size: 22px; letter-spacing: 1px; }
+  #p5m-overlay span::before { content: "▶"; font-size: 20px; }
+  #p5m-bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: linear-gradient(transparent, rgba(0,0,0,.7)); color: #eee; transition: opacity .3s; }
+  #p5m-bar button { background: none; border: 0; color: #fff; font-size: 16px; cursor: pointer; padding: 6px 8px; border-radius: 6px; font-family: inherit; }
+  #p5m-bar button:hover { background: rgba(255,255,255,.14); }
+  #p5m-seek { flex: 1; accent-color: #2dd4bf; min-width: 60px; }
+  #p5m-time { font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
+  #p5m-status { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); padding: 8px 16px; border-radius: 8px; background: rgba(20,20,28,.85); color: #fff; font-size: 14px; }
+  #p5m-status[hidden] { display: none; }
+  body.p5m-idle #p5m-bar { opacity: 0; }
+  body.p5m-idle { cursor: none; }
+  body.p5m-exporting #p5m-bar, body.p5m-exporting #p5m-overlay, body.p5m-frozen #p5m-bar, body.p5m-frozen #p5m-overlay, body.p5m-frozen #p5m-status { display: none; }
+  @media (max-width: 520px) { #p5m-bar { gap: 6px; padding: 8px 10px; } #p5m-time { display: none; } }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script>
+<!--P5M:RUNTIME-->
+</head>
+<body>
+<div id="p5m-stage"></div>
+<button id="p5m-overlay" type="button" hidden><span>播放</span></button>
+<div id="p5m-bar">
+  <button id="p5m-play" type="button" title="播放／暫停（空白鍵）">▶</button>
+  <input id="p5m-seek" type="range" min="0" max="10" step="0.033" value="0" aria-label="播放位置">
+  <span id="p5m-time">00:00.00</span>
+  <button id="p5m-export" type="button" title="錄製並下載 MP4">下載影片</button>
+  <button id="p5m-full" type="button" title="全螢幕">⛶</button>
+</div>
+<div id="p5m-status" hidden></div>
+<script type="application/json" id="p5maker-project">__P5M_PROJECT__</script>
+<!--P5M:PLAYER-->
+</body>
+</html>

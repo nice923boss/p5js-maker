@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>Runtime 冒煙測試</title>
+<style>
+  body { margin: 0; background: #222; color: #ddd; font: 14px "Noto Sans TC", sans-serif; }
+  #stage canvas { width: 960px; height: 540px; display: block; }
+  #log { white-space: pre-wrap; padding: 8px; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script>
+<script>
+  // Load runtime scripts in manifest order (dev only; exports inline them)
+  window.__runtimeLoaded = fetch('../runtime/manifest.json').then((r) => r.json()).then(async (m) => {
+    for (const f of m.runtime) {
+      await new Promise((res, rej) => { const s = document.createElement('script'); s.src = '../runtime/' + f; s.onload = res; s.onerror = () => rej(new Error(f)); document.head.appendChild(s); });
+    }
+  });
+</script>
+</head>
+<body>
+<div id="stage"></div>
+<div id="log"></div>
+<script>
+  // window.SMOKE.frame(t) renders a frame and returns timing + non-background pixel ratio
+  window.SMOKE = { ready: (async () => {
+    await window.__runtimeLoaded;
+    const src = new URLSearchParams(location.search).get('project') || '../examples/smoke.json';
+    const project = P5M.normalizeProject(await (await fetch(src)).json());
+    const { width: W, height: H } = project.settings;
+    let pInst;
+    await new Promise((res) => { pInst = new p5((p) => { p.setup = () => { p.pixelDensity(1); p.createCanvas(W, H); p.noLoop(); res(); }; }, 'stage'); });
+    await P5M.prepare(pInst, project);
+    const S = window.SMOKE;
+    S.project = project; S.p = pInst;
+    S.frame = (t) => {
+      const t0 = performance.now();
+      const hits = P5M.renderFrame(pInst, project, t);
+      const ms = performance.now() - t0;
+      const d = pInst.drawingContext.getImageData(0, 0, W, H).data;
+      let lit = 0;
+      for (let i = 0; i < d.length; i += 16) if (d[i] + d[i + 1] + d[i + 2] > 120) lit++;
+      return { t, ms: +ms.toFixed(2), hits: hits.length, litRatio: +(lit / (d.length / 16)).toFixed(3) };
+    };
+    document.getElementById('log').textContent = '已載入：' + Object.keys(P5M.types).length + ' 種圖層類型';
+    return true;
+  })().catch((err) => { document.getElementById('log').textContent = '錯誤：' + err.message; console.error(err); throw err; }) };
+</script>
+</body>
+</html>

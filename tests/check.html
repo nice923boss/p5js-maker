@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>專案檢查</title>
+<style>
+  body { margin: 0; background: #222; color: #ddd; font: 14px "Noto Sans TC", sans-serif; }
+  #stage canvas { max-width: 960px; height: auto !important; display: block; }
+  #log { white-space: pre-wrap; padding: 8px; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script>
+<script>
+  // Load runtime scripts in manifest order, then the checker (dev only; exports inline the runtime)
+  window.__runtimeLoaded = fetch('../runtime/manifest.json').then((r) => r.json()).then(async (m) => {
+    for (const f of [...m.runtime.map((x) => '../runtime/' + x), 'check.js']) {
+      await new Promise((res, rej) => { const s = document.createElement('script'); s.src = f; s.onload = res; s.onerror = () => rej(new Error(f)); document.head.appendChild(s); });
+    }
+  });
+</script>
+</head>
+<body>
+<div id="stage"></div>
+<div id="log"></div>
+<script>
+  // Driven by tools/check_project.py:
+  //   await CHECK.ready                      runtime + checker loaded
+  //   CHECK.validate(json)                   { errors, warnings }
+  //   await CHECK.load(json)                 create the canvas and wait for assets and fonts
+  //   CHECK.frame(t)                         { png, contentRatio } for project time t
+  //   CHECK.typesMarkdown()                  type reference for the Claude SKILL
+  window.__checkReady = (async () => {
+    await window.__runtimeLoaded;
+    let pInst, project, bg;
+    window.CHECK.load = async (src) => {
+      project = P5M.normalizeProject(JSON.parse(JSON.stringify(src)));
+      const { width: W, height: H, background } = project.settings;
+      bg = background === 'transparent' ? [0, 0, 0, 0] : P5M.parseColor(background);
+      await new Promise((res) => { pInst = new p5((p) => { p.setup = () => { p.pixelDensity(1); p.createCanvas(W, H); p.noLoop(); res(); }; }, 'stage'); });
+      await P5M.prepare(pInst, project);
+      return true;
+    };
+    // contentRatio = share of sampled pixels that differ from the project background
+    window.CHECK.frame = (t) => {
+      P5M.renderFrame(pInst, project, t);
+      const { width: W, height: H } = project.settings;
+      const d = pInst.drawingContext.getImageData(0, 0, W, H).data;
+      let diff = 0, n = 0;
+      for (let i = 0; i < d.length; i += 64, n++) {
+        const a = d[i + 3] / 255;
+        if (Math.abs(d[i] - bg[0]) + Math.abs(d[i + 1] - bg[1]) + Math.abs(d[i + 2] - bg[2]) > 24 || Math.abs(a - bg[3]) > 0.1) diff++;
+      }
+      return { png: pInst.canvas.toDataURL('image/png'), contentRatio: +(diff / n).toFixed(4) };
+    };
+    document.getElementById('log').textContent = '已載入：' + Object.keys(P5M.types).length + ' 種圖層類型';
+    return true;
+  })().catch((err) => { document.getElementById('log').textContent = '錯誤：' + err.message; console.error(err); throw err; });
+</script>
+</body>
+</html>

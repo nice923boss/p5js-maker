@@ -1,0 +1,116 @@
+{
+  "format": "p5maker",
+  "version": 1,
+  "title": "P5JS Maker 示範片",
+  "settings": { "width": 1280, "height": 720, "fps": 30, "duration": 24, "background": "#05060f" },
+  "assets": {},
+  "camera": {
+    "props": {},
+    "keys": {
+      "zoom": [
+        { "t": 0, "v": 1, "e": "easeInOut" }, { "t": 7.8, "v": 1.1, "e": "linear" }, { "t": 8.2, "v": 1, "e": "easeInOut" },
+        { "t": 15.8, "v": 1.06, "e": "linear" }, { "t": 16.2, "v": 1, "e": "easeInOut" }, { "t": 24, "v": 1.08 }
+      ],
+      "shake": [
+        { "t": 0, "v": 0, "e": "linear" }, { "t": 18.9, "v": 0, "e": "linear" }, { "t": 19.05, "v": 10, "e": "easeOut" }, { "t": 19.7, "v": 0 }
+      ]
+    }
+  },
+  "tracks": [
+    { "id": "t_fx", "name": "特效", "kind": "visual", "clips": [
+      { "id": "c_flash", "type": "fx_flash", "start": 19, "duration": 0.3, "props": { "amount": 0.5, "color": "#fff3d6" } },
+      { "id": "c_fade", "type": "fx_fade", "start": 22.5, "duration": 1.5, "props": { "mode": "out", "color": "#000000" } }
+    ] },
+    { "id": "t_leak", "name": "漏光", "kind": "visual", "clips": [
+      { "id": "c_leak", "type": "fx_lightLeak", "start": 16, "duration": 8, "props": { "amount": 0.35 } }
+    ] },
+    { "id": "t_vig", "name": "暗角", "kind": "visual", "clips": [
+      { "id": "c_vig", "type": "fx_vignette", "start": 0, "duration": 24, "props": {} }
+    ] },
+    { "id": "t_box", "name": "寬銀幕", "kind": "visual", "clips": [
+      { "id": "c_letter", "type": "fx_letterbox", "start": 16, "duration": 8, "props": { "ratio": 2.35 } }
+    ] },
+    { "id": "t_tr", "name": "轉場", "kind": "visual", "clips": [
+      { "id": "c_iris", "type": "tr_iris", "start": 7.6, "duration": 0.8, "props": { "color": "#05060f" } },
+      { "id": "c_wipe", "type": "tr_wipe", "start": 15.6, "duration": 0.8, "props": { "color": "#0b0d1c", "dir": "right" } }
+    ] },
+    { "id": "t_text", "name": "標題", "kind": "visual", "clips": [
+      { "id": "c_title", "type": "text", "start": 0.4, "duration": 7.2,
+        "props": { "text": "P5JS Maker", "font": "Poppins", "weight": 900, "size": 128, "y": 300, "glow": 24, "glowColor": "#ffd27a" },
+        "anim": { "in": { "type": "stamp", "dur": 1.2 }, "out": { "type": "blur" }, "loop": { "type": "none" } } },
+      { "id": "c_t2", "type": "text", "start": 8.6, "duration": 6.8,
+        "props": { "text": "生成藝術 × 3D × 關鍵影格", "size": 52, "y": 130, "fill": "#e8f7ff", "glow": 12, "glowColor": "#3ef0a0" },
+        "anim": { "in": { "type": "rise" }, "out": { "type": "fade" }, "loop": { "type": "none" } } },
+      { "id": "c_t3", "type": "text", "start": 17, "duration": 6.2,
+        "props": { "text": "一起動起來！", "size": 96, "y": 460, "fill": "#fff3d6", "stroke": "#7a2a1a", "strokeWeight": 6 },
+        "anim": { "in": { "type": "bounceIn" }, "out": { "type": "none" }, "loop": { "type": "none" } } }
+    ] },
+    { "id": "t_sub", "name": "副標", "kind": "visual", "clips": [
+      { "id": "c_sub", "type": "text", "start": 1.6, "duration": 6,
+        "props": { "text": "像剪影片一樣，做 p5.js 動畫", "size": 40, "y": 420, "fill": "#ffe9c2" },
+        "anim": { "in": { "type": "typewriter" }, "out": { "type": "fade" }, "loop": { "type": "none" } } }
+    ] },
+    { "id": "t_obj", "name": "物件", "kind": "visual", "clips": [
+      { "id": "c_torus", "type": "shape3d", "start": 8, "duration": 8,
+        "props": { "x": 400, "y": 380, "size": 170, "kind": "torus", "color": "#ff8a5c", "material": "specular" },
+        "anim": { "in": { "type": "zoomIn" }, "loop": { "type": "none" } } },
+      { "id": "c_heart", "type": "shape", "start": 16, "duration": 8,
+        "props": { "kind": "heart", "x": 640, "y": 270, "w": 150, "h": 150, "fill": "#ff6b8b", "gradient": "radial", "fill2": "#ff9ab8", "glow": 20, "glowColor": "#ff9ab8" },
+        "anim": { "in": { "type": "pop" }, "loop": { "type": "heartbeat" } } }
+    ] },
+    { "id": "t_obj2", "name": "物件 2", "kind": "visual", "clips": [
+      { "id": "c_sphere", "type": "shape3d", "start": 8, "duration": 8,
+        "props": { "x": 880, "y": 380, "size": 150, "kind": "sphere", "color": "#4cc9f0", "material": "wireframe" },
+        "anim": { "in": { "type": "pop" }, "loop": { "type": "float" } } }
+    ] },
+    { "id": "t_star", "name": "關鍵影格", "kind": "visual", "clips": [
+      { "id": "c_star", "type": "shape", "start": 8, "duration": 8,
+        "props": { "kind": "star", "x": 160, "y": 600, "w": 90, "h": 90, "fill": "#ffd166", "glow": 16, "glowColor": "#ffd166" },
+        "keys": {
+          "x": [{ "t": 0, "v": 160, "e": "easeInOut" }, { "t": 7.5, "v": 1120 }],
+          "rotation": [{ "t": 0, "v": 0, "e": "linear" }, { "t": 7.5, "v": 360 }]
+        },
+        "anim": { "loop": { "type": "pulse" } } }
+    ] },
+    { "id": "t_part", "name": "粒子", "kind": "visual", "clips": [
+      { "id": "c_lant", "type": "particles", "start": 0, "duration": 8, "props": { "preset": "lanterns", "count": 22, "size": 26, "speed": 1, "wind": 0.1, "color": "#ffb84d", "color2": "#ff7a2f" } },
+      { "id": "c_fw", "type": "particles", "start": 16.5, "duration": 7.5, "props": { "preset": "fireworks", "count": 300, "size": 4, "speed": 1, "wind": 0, "color": "#ffd166", "color2": "#ff5d8f" } }
+    ] },
+    { "id": "t_part2", "name": "粒子 2", "kind": "visual", "clips": [
+      { "id": "c_conf", "type": "particles", "start": 19, "duration": 5, "props": { "preset": "confetti", "count": 120, "size": 9, "speed": 1, "wind": 0.2, "color": "#ffd166", "color2": "#ef476f" } }
+    ] },
+    { "id": "t_near", "name": "前景", "kind": "visual", "clips": [
+      { "id": "c_cloud", "type": "gen", "start": 0, "duration": 8, "props": { "preset": "clouds", "y": 560, "h": 320, "opacity": 0.55, "color": "#2a3560", "color2": "#1d2748", "density": 0.3, "speed": 1.5 } },
+      { "id": "c_warp", "type": "gen", "start": 8, "duration": 8, "props": { "preset": "starfield", "opacity": 0.7, "color": "#ffffff", "density": 0.3, "speed": 0.6 } },
+      { "id": "c_mount", "type": "gen", "start": 16, "duration": 8, "props": { "preset": "mountains", "y": 520, "h": 400, "color": "#2a1a3c", "color2": "#0c0814", "density": 0.4, "speed": 0.2, "amount": 1 } }
+    ] },
+    { "id": "t_far", "name": "遠景", "kind": "visual", "clips": [
+      { "id": "c_moon", "type": "gen", "start": 0, "duration": 8,
+        "props": { "preset": "moon", "x": 980, "y": 250, "w": 380, "h": 380, "color": "#fff6d8", "color2": "#ffd98a", "amount": 1, "density": 0.5 },
+        "keys": { "y": [{ "t": 0, "v": 250, "e": "easeOut" }, { "t": 8, "v": 170 }] } },
+      { "id": "c_aurora", "type": "gen", "start": 8, "duration": 8, "props": { "preset": "aurora", "color": "#3ef0a0", "color2": "#8a5cff", "density": 0.6, "speed": 1, "amount": 1 } }
+    ] },
+    { "id": "t_stars", "name": "星空", "kind": "visual", "clips": [
+      { "id": "c_stars", "type": "particles", "start": 0, "duration": 8, "props": { "preset": "stars", "count": 120, "size": 2.5, "speed": 1, "wind": 0, "color": "#ffffff", "color2": "#ffe9a8" } }
+    ] },
+    { "id": "t_sky", "name": "天空", "kind": "visual", "followCamera": false, "clips": [
+      { "id": "c_sky1", "type": "gen", "start": 0, "duration": 8, "props": { "preset": "gradientSky", "color": "#070b1e", "color2": "#1f2a5a", "color3": "#6b4a7a", "amount": 0.3 } },
+      { "id": "c_sky2", "type": "gen", "start": 8, "duration": 8, "props": { "preset": "gradientSky", "color": "#03040c", "color2": "#0a1030", "color3": "#1a1446", "amount": 0.3 } },
+      { "id": "c_sky3", "type": "gen", "start": 16, "duration": 8, "props": { "preset": "gradientSky", "color": "#120a24", "color2": "#3a1840", "color3": "#a8452e", "amount": 0.3 } }
+    ] },
+    { "id": "t_music", "name": "配樂", "kind": "audio", "clips": [
+      { "id": "c_music", "type": "music", "start": 0, "duration": 24, "props": { "preset": "festive", "volume": 0.7, "fadeIn": 1, "fadeOut": 2.5 } }
+    ] },
+    { "id": "t_sfx", "name": "音效", "kind": "audio", "clips": [
+      { "id": "c_chime", "type": "sfx", "start": 0.5, "duration": 1.5, "props": { "voice": "chime" } },
+      { "id": "c_wh1", "type": "sfx", "start": 7.6, "duration": 0.8, "props": { "voice": "whoosh" } },
+      { "id": "c_pop", "type": "sfx", "start": 8.5, "duration": 0.8, "props": { "voice": "pop" } },
+      { "id": "c_wh2", "type": "sfx", "start": 15.6, "duration": 0.8, "props": { "voice": "whoosh" } },
+      { "id": "c_gliss", "type": "sfx", "start": 16.8, "duration": 1, "props": { "voice": "glissando", "up": true } },
+      { "id": "c_strike", "type": "sfx", "start": 19, "duration": 1.2, "props": { "voice": "strike" } }
+    ] },
+    { "id": "t_sfx2", "name": "環境音", "kind": "audio", "clips": [
+      { "id": "c_crackle", "type": "sfx", "start": 16.5, "duration": 5.5, "props": { "voice": "crackle", "volume": 0.6 } }
+    ] }
+  ]
+}
