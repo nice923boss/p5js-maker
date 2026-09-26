@@ -181,3 +181,16 @@ SKILL 位置 `~/.claude/skills/p5js-maker/`：`SKILL.md`（7 步流程、JSON �
 - 離線執行檢查工具（G20）。
 - 生日片與示範片的聲音內容（G8、G22）。
 - 由另一個 Claude 對話實際觸發 SKILL（本次在同一對話內照 SKILL.md 步驟執行）。
+
+## 2026-09-26 發布到 GitHub Pages
+
+repo `nice923boss/p5js-maker`（公開、MIT），Pages 從 `main` 根目錄提供：https://nice923boss.github.io/p5js-maker/ 。exe 與 `stop.bat` 放在 Release v1.0.0，不進 git。`skill/p5js-maker/` 是 SKILL 公開版，本機路徑改成 `<ROOT>`。文件中的本機路徑改成文字描述。
+
+| 項目 | 結果 |
+|---|---|
+| 線上版 | 首頁 200，26 種類型載入，footer 顯示製作者，載入過程無 console 錯誤 |
+| 開啟 demo.json | 19 軌，標題正確，12 秒預覽畫面正常 |
+| 匯出 HTML | stub 下載，142,916 bytes（Pages 上 fetch runtime 正常） |
+| Release | `P5JSMaker.exe` 9,098,266 bytes、`stop.bat` 386 bytes |
+
+未驗證：線上版錄製影片、手機與 Firefox／Safari 開啟、其他人照 README 安裝 SKILL。
