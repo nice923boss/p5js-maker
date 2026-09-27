@@ -194,3 +194,33 @@ repo `nice923boss/p5js-maker`（公開、MIT），Pages 從 `main` 根目錄提�
 | Release | `P5JSMaker.exe` 9,098,266 bytes、`stop.bat` 386 bytes |
 
 未驗證：線上版錄製影片、手機與 Firefox／Safari 開啟、其他人照 README 安裝 SKILL。
+
+## 2026-09-27 使用說明頁
+
+導覽列新增「使用說明」連結，開啟 `help.html`（15 個章節，各區塊操作步驟）。`tools/P5JSMaker.spec` 已把 `help.html` 加入打包清單，exe 已重建（9,109,158 bytes）：以 `BROWSER` 指向記錄用 bat 啟動，`index.html`、`help.html` 皆 200 且大小與原始檔相同，stop.bat 結束後連接埠 38920 釋放、無殘留程序。Release v1.0.0 上的 exe 仍是舊版，沒有這一頁。
+
+## 2026-09-27 HoloTeam 版 SKILL 與指令介面
+
+判定：原本的 `skill/p5js-maker` 不能直接給 HoloTeam 小模型用。它要求手寫整份專案 JSON、用 Playwright 渲染取樣畫面、再由模型看圖判斷，小模型寫長 JSON 易出錯、也不一定能讀圖。
+
+新增 `skill/p5js-maker-holoteam/`：
+
+| 檔案 | 內容 |
+|---|---|
+| `scripts/p5m.py` 與 `p5m_*.py` | 只用標準庫的指令介面：new、info、show、validate、types、catalog、add、set、key、unkey、anim、move、split、dup、delete、track、camera、asset、plan、build；python 工具可用 `p5m.cli([...])` 呼叫 |
+| `reference/API.md` | 指令說明、編輯器操作對照表、分鏡格式、常見錯誤 |
+| `reference/types.md`、`schema.json` | 26 種圖層類型屬性，由 `tools/export_schema.js` 從 runtime 匯出 |
+| `templates/storyboard_example.json` | 分鏡範例 |
+| `SKILL.md` | 骨架 A：開場、6 題訪談、plan 排場景、generate_image 配圖、寫分鏡並 build、交付、修改模式 |
+
+| 測試 | 結果 |
+|---|---|
+| 驗證器與 `tests/check.js` 對照 | 同一批錯誤專案，錯誤與警告一致 |
+| build：16:9 warm、9:16 fresh 3 分鐘、1:1 night | 皆 0 錯誤 0 警告，渲染取樣畫面人工檢視無異常 |
+| API.md 每個範例指令 | 輸出與文件一致，預期的錯誤訊息正確出現 |
+| 模擬 HoloTeam 流程（假 vault、工作目錄在 vault 根、相對路徑） | plan、build 0 錯誤 0 警告；階段 6 修改表 21 個指令全部成功，最後 validate 0 錯誤 0 警告 |
+| `holoteam-skill-writer/scripts/check_skill.py SKILL.md A` | 必查 8 項通過，提醒 0 項 |
+
+測試中發現並修正：匯入音樂不給 `--dur` 只放 4 秒（腳本讀不出音訊長度），SKILL 與 API.md 改為要求一律帶 `--dur`（G25）；分鏡範例原本 5 場與 1 分鐘 plan 建議的 4 場不一致，改成 4 場。
+
+未驗證：HoloTeam 小模型實際觸發與對話（G23）、FLUX.2 klein 生圖（G24）。
