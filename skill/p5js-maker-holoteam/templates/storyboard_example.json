@@ -1,0 +1,13 @@
+{
+  "title": "秋日小旅行",
+  "minutes": 1,
+  "aspect": "16:9",
+  "style": "warm",
+  "music": "warm",
+  "scenes": [
+    {"layout": "cover", "title": "秋日小旅行", "subtitle": "一個人的山城散步", "image": "D:/vault/輸出/P5JS動畫/秋日小旅行/images/20260927_scene1.png"},
+    {"layout": "caption", "title": "清晨出發", "lines": ["天還沒亮就搭上第一班公車", "窗外的山慢慢被陽光染成金色", "背包裡只帶了相機和一本書"], "image": "D:/vault/輸出/P5JS動畫/秋日小旅行/images/20260927_scene2.png", "particles": "leaves"},
+    {"layout": "side", "title": "老街午後", "lines": ["石板路兩旁是百年的木造房子", "巷口阿嬤的麻糬還是熱的"], "image": "D:/vault/輸出/P5JS動畫/秋日小旅行/images/20260927_scene3.png", "transition": "wipe"},
+    {"layout": "cover", "title": "下次見", "subtitle": "謝謝收看", "background": "clouds", "camera": "still"}
+  ]
+}

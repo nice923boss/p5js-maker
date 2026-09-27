@@ -52,6 +52,20 @@
 | `tools/embed_assets.py` | 本機圖片與音訊轉成 data URL 寫進專案 |
 | `tools/build_player.py` | 專案 JSON 轉成獨立播放 HTML |
 
+## 給 HoloTeam（小模型）用的 SKILL
+
+`skill/p5js-maker-holoteam/` 讓 HoloTeam 搭配開源小模型用打字做動畫：說出主題與片長，一問一答問清內容，內建生圖配插圖，產出專案 JSON；也能用指令修改既有專案。只需要 Python 3.9 以上，不用裝套件。
+
+1. 把 `skill/p5js-maker-holoteam` 整個資料夾複製到 vault 的 `.claude/skills/`，或 `~/.claude/skills/`。
+2. HoloTeam 設定開啟 python 工具；要配插圖就在「設定、AI 引擎、生成模型」填入生圖 API Key。
+3. 對 HoloTeam 說「幫我做一支動畫」或「修改P5JS動畫」即可觸發。
+
+| 檔案 | 用途 |
+|---|---|
+| `scripts/p5m.py` | 指令介面：建立、查看、修改、檢查專案，由分鏡產生整支影片 |
+| `reference/API.md` | 全部指令說明與編輯器操作對照表（不用 SKILL 也能照這份文件打字改專案） |
+| `reference/types.md` | 26 種圖層類型的屬性、預設值、選項 |
+
 ## 已知限制
 
 完整清單見 [GAPS.md](GAPS.md)。

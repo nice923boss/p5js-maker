@@ -1,0 +1,3170 @@
+{
+ "generated": "tools/export_schema.js",
+ "version": 1,
+ "p5": "https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js",
+ "common": [
+  "x",
+  "y",
+  "scale",
+  "rotation",
+  "opacity",
+  "blur",
+  "brightness",
+  "contrast",
+  "saturate",
+  "hue"
+ ],
+ "camera": [
+  "x",
+  "y",
+  "zoom",
+  "rotation",
+  "shake"
+ ],
+ "blends": [
+  [
+   "source-over",
+   "一般"
+  ],
+  [
+   "multiply",
+   "色彩增值"
+  ],
+  [
+   "screen",
+   "濾色"
+  ],
+  [
+   "overlay",
+   "覆蓋"
+  ],
+  [
+   "soft-light",
+   "柔光"
+  ],
+  [
+   "lighter",
+   "相加發光"
+  ],
+  [
+   "difference",
+   "差異"
+  ]
+ ],
+ "ease": {
+  "linear": "線性",
+  "easeIn": "漸快",
+  "easeOut": "漸慢",
+  "easeInOut": "慢快慢",
+  "sine": "柔和",
+  "backOut": "回彈",
+  "backIn": "蓄力",
+  "elastic": "彈簧",
+  "bounce": "落地彈跳",
+  "hold": "瞬間切換"
+ },
+ "fonts": [
+  {
+   "family": "Noto Sans TC",
+   "label": "思源黑體"
+  },
+  {
+   "family": "Noto Serif TC",
+   "label": "思源宋體"
+  },
+  {
+   "family": "LXGW WenKai TC",
+   "label": "霞鶩文楷"
+  },
+  {
+   "family": "Microsoft JhengHei",
+   "label": "微軟正黑體（系統）"
+  },
+  {
+   "family": "Poppins",
+   "label": "Poppins"
+  },
+  {
+   "family": "Playfair Display",
+   "label": "Playfair Display"
+  },
+  {
+   "family": "Pacifico",
+   "label": "Pacifico（手寫）"
+  }
+ ],
+ "anim": {
+  "in": {
+   "none": {
+    "label": "無",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": false
+   },
+   "fade": {
+    "label": "淡入",
+    "uses": null,
+    "d": null,
+    "dur": 0.6,
+    "text": false
+   },
+   "slideLeft": {
+    "label": "左側滑入",
+    "uses": null,
+    "d": null,
+    "dur": 0.7,
+    "text": false
+   },
+   "slideRight": {
+    "label": "右側滑入",
+    "uses": null,
+    "d": null,
+    "dur": 0.7,
+    "text": false
+   },
+   "slideUp": {
+    "label": "下方升起",
+    "uses": null,
+    "d": null,
+    "dur": 0.7,
+    "text": false
+   },
+   "slideDown": {
+    "label": "上方落下",
+    "uses": null,
+    "d": null,
+    "dur": 0.7,
+    "text": false
+   },
+   "zoomIn": {
+    "label": "放大出現",
+    "uses": null,
+    "d": null,
+    "dur": 0.6,
+    "text": false
+   },
+   "zoomOut": {
+    "label": "縮小出現",
+    "uses": null,
+    "d": null,
+    "dur": 0.7,
+    "text": false
+   },
+   "pop": {
+    "label": "彈出",
+    "uses": null,
+    "d": null,
+    "dur": 0.6,
+    "text": false
+   },
+   "drop": {
+    "label": "掉落彈跳",
+    "uses": null,
+    "d": null,
+    "dur": 0.9,
+    "text": false
+   },
+   "spin": {
+    "label": "旋轉出現",
+    "uses": null,
+    "d": null,
+    "dur": 0.8,
+    "text": false
+   },
+   "flip": {
+    "label": "翻轉",
+    "uses": null,
+    "d": null,
+    "dur": 0.6,
+    "text": false
+   },
+   "blur": {
+    "label": "模糊淡入",
+    "uses": null,
+    "d": null,
+    "dur": 0.8,
+    "text": false
+   },
+   "wipe": {
+    "label": "擦除展開",
+    "uses": null,
+    "d": null,
+    "dur": 0.8,
+    "text": false
+   },
+   "iris": {
+    "label": "圓形展開",
+    "uses": null,
+    "d": null,
+    "dur": 0.8,
+    "text": false
+   },
+   "typewriter": {
+    "label": "打字機",
+    "uses": null,
+    "d": null,
+    "dur": 1.2,
+    "text": true
+   },
+   "stamp": {
+    "label": "逐字蓋章",
+    "uses": null,
+    "d": null,
+    "dur": 1.4,
+    "text": true
+   },
+   "rise": {
+    "label": "逐字升起",
+    "uses": null,
+    "d": null,
+    "dur": 1.2,
+    "text": true
+   },
+   "bounceIn": {
+    "label": "逐字彈跳",
+    "uses": null,
+    "d": null,
+    "dur": 1.2,
+    "text": true
+   }
+  },
+  "out": {
+   "none": {
+    "label": "無",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": false
+   },
+   "fade": {
+    "label": "淡出",
+    "uses": null,
+    "d": null,
+    "dur": 0.6,
+    "text": false
+   },
+   "slideLeft": {
+    "label": "向左滑出",
+    "uses": null,
+    "d": null,
+    "dur": 0.7,
+    "text": false
+   },
+   "slideRight": {
+    "label": "向右滑出",
+    "uses": null,
+    "d": null,
+    "dur": 0.7,
+    "text": false
+   },
+   "slideUp": {
+    "label": "向上飄走",
+    "uses": null,
+    "d": null,
+    "dur": 0.7,
+    "text": false
+   },
+   "slideDown": {
+    "label": "向下落下",
+    "uses": null,
+    "d": null,
+    "dur": 0.7,
+    "text": false
+   },
+   "zoomOut": {
+    "label": "縮小消失",
+    "uses": null,
+    "d": null,
+    "dur": 0.6,
+    "text": false
+   },
+   "zoomIn": {
+    "label": "放大消失",
+    "uses": null,
+    "d": null,
+    "dur": 0.6,
+    "text": false
+   },
+   "pop": {
+    "label": "收回",
+    "uses": null,
+    "d": null,
+    "dur": 0.5,
+    "text": false
+   },
+   "spin": {
+    "label": "旋轉消失",
+    "uses": null,
+    "d": null,
+    "dur": 0.8,
+    "text": false
+   },
+   "flip": {
+    "label": "翻轉",
+    "uses": null,
+    "d": null,
+    "dur": 0.6,
+    "text": false
+   },
+   "blur": {
+    "label": "模糊淡出",
+    "uses": null,
+    "d": null,
+    "dur": 0.8,
+    "text": false
+   },
+   "wipe": {
+    "label": "擦除收起",
+    "uses": null,
+    "d": null,
+    "dur": 0.8,
+    "text": false
+   },
+   "iris": {
+    "label": "圓形收合",
+    "uses": null,
+    "d": null,
+    "dur": 0.8,
+    "text": false
+   },
+   "typewriter": {
+    "label": "倒退刪字",
+    "uses": null,
+    "d": null,
+    "dur": 1,
+    "text": true
+   },
+   "fall": {
+    "label": "逐字掉落",
+    "uses": null,
+    "d": null,
+    "dur": 1.2,
+    "text": true
+   }
+  },
+  "loop": {
+   "none": {
+    "label": "無",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": false
+   },
+   "float": {
+    "label": "漂浮",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": false
+   },
+   "pulse": {
+    "label": "呼吸",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": false
+   },
+   "sway": {
+    "label": "搖擺",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": false
+   },
+   "spin": {
+    "label": "持續旋轉",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": false
+   },
+   "blink": {
+    "label": "閃爍",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": false
+   },
+   "flicker": {
+    "label": "燭光",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": false
+   },
+   "shake": {
+    "label": "抖動",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": false
+   },
+   "heartbeat": {
+    "label": "心跳",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": false
+   },
+   "jelly": {
+    "label": "果凍",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": false
+   },
+   "wave": {
+    "label": "逐字波浪",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": true
+   },
+   "glyphPulse": {
+    "label": "逐字閃亮",
+    "uses": null,
+    "d": null,
+    "dur": null,
+    "text": true
+   }
+  }
+ },
+ "particlePresets": {
+  "snow": {
+   "label": "雪花",
+   "uses": null,
+   "d": {
+    "count": 180,
+    "size": 7,
+    "speed": 1,
+    "wind": 0.3,
+    "color": "#ffffff",
+    "color2": "#d6e9ff"
+   },
+   "dur": null,
+   "text": false
+  },
+  "rain": {
+   "label": "雨",
+   "uses": null,
+   "d": {
+    "count": 220,
+    "size": 2,
+    "speed": 1,
+    "wind": 0.15,
+    "color": "#b8d4ff",
+    "color2": "#7fa8e0"
+   },
+   "dur": null,
+   "text": false
+  },
+  "sakura": {
+   "label": "櫻花",
+   "uses": null,
+   "d": {
+    "count": 70,
+    "size": 10,
+    "speed": 1,
+    "wind": 0.6,
+    "color": "#ffc4d6",
+    "color2": "#ff9ab8"
+   },
+   "dur": null,
+   "text": false
+  },
+  "leaves": {
+   "label": "落葉",
+   "uses": null,
+   "d": {
+    "count": 45,
+    "size": 14,
+    "speed": 1,
+    "wind": 0.5,
+    "color": "#e8923a",
+    "color2": "#c0392b"
+   },
+   "dur": null,
+   "text": false
+  },
+  "confetti": {
+   "label": "彩色紙花",
+   "uses": null,
+   "d": {
+    "count": 160,
+    "size": 9,
+    "speed": 1,
+    "wind": 0.2,
+    "color": "#ffd166",
+    "color2": "#ef476f"
+   },
+   "dur": null,
+   "text": false
+  },
+  "bubbles": {
+   "label": "泡泡",
+   "uses": null,
+   "d": {
+    "count": 40,
+    "size": 22,
+    "speed": 1,
+    "wind": 0,
+    "color": "#bfefff",
+    "color2": "#ffffff"
+   },
+   "dur": null,
+   "text": false
+  },
+  "embers": {
+   "label": "火星",
+   "uses": null,
+   "d": {
+    "count": 90,
+    "size": 5,
+    "speed": 1,
+    "wind": 0.1,
+    "color": "#ffb347",
+    "color2": "#ff4e1a"
+   },
+   "dur": null,
+   "text": false
+  },
+  "lanterns": {
+   "label": "天燈",
+   "uses": null,
+   "d": {
+    "count": 24,
+    "size": 26,
+    "speed": 1,
+    "wind": 0.1,
+    "color": "#ffb84d",
+    "color2": "#ff7a2f"
+   },
+   "dur": null,
+   "text": false
+  },
+  "hearts": {
+   "label": "愛心飄升",
+   "uses": null,
+   "d": {
+    "count": 36,
+    "size": 14,
+    "speed": 1,
+    "wind": 0,
+    "color": "#ff6b8b",
+    "color2": "#ffb3c6"
+   },
+   "dur": null,
+   "text": false
+  },
+  "fireflies": {
+   "label": "螢火蟲",
+   "uses": null,
+   "d": {
+    "count": 50,
+    "size": 6,
+    "speed": 1,
+    "wind": 0,
+    "color": "#d9ff7a",
+    "color2": "#fff3a0"
+   },
+   "dur": null,
+   "text": false
+  },
+  "dust": {
+   "label": "光塵",
+   "uses": null,
+   "d": {
+    "count": 120,
+    "size": 3,
+    "speed": 0.5,
+    "wind": 0,
+    "color": "#fff2cc",
+    "color2": "#ffffff"
+   },
+   "dur": null,
+   "text": false
+  },
+  "stars": {
+   "label": "星星閃爍",
+   "uses": null,
+   "d": {
+    "count": 160,
+    "size": 3,
+    "speed": 1,
+    "wind": 0,
+    "color": "#ffffff",
+    "color2": "#ffe9a8"
+   },
+   "dur": null,
+   "text": false
+  },
+  "fog": {
+   "label": "霧氣",
+   "uses": null,
+   "d": {
+    "count": 26,
+    "size": 220,
+    "speed": 1,
+    "wind": 1,
+    "color": "#ffffff",
+    "color2": "#dde6f0"
+   },
+   "dur": null,
+   "text": false
+  },
+  "fireworks": {
+   "label": "煙火",
+   "uses": null,
+   "d": {
+    "count": 240,
+    "size": 4,
+    "speed": 1,
+    "wind": 0,
+    "color": "#ffd166",
+    "color2": "#ff5d8f"
+   },
+   "dur": null,
+   "text": false
+  }
+ },
+ "genPresets": {
+  "gradientSky": {
+   "label": "漸層天空",
+   "uses": [
+    "color",
+    "color2",
+    "color3",
+    "amount"
+   ],
+   "d": {
+    "color": "#0b1a3a",
+    "color2": "#4a3a78",
+    "color3": "#f29b76",
+    "amount": 0.3
+   },
+   "dur": null,
+   "text": false
+  },
+  "moon": {
+   "label": "明月",
+   "uses": [
+    "color",
+    "color2",
+    "amount",
+    "density"
+   ],
+   "d": {
+    "color": "#fff6d8",
+    "color2": "#ffd98a",
+    "amount": 1,
+    "density": 0.5,
+    "w": 360,
+    "h": 360
+   },
+   "dur": null,
+   "text": false
+  },
+  "clouds": {
+   "label": "雲朵",
+   "uses": [
+    "color",
+    "color2",
+    "density",
+    "speed"
+   ],
+   "d": {
+    "color": "#ffffff",
+    "color2": "#dfe7f2",
+    "density": 0.5,
+    "speed": 1
+   },
+   "dur": null,
+   "text": false
+  },
+  "mountains": {
+   "label": "層疊山巒",
+   "uses": [
+    "color",
+    "color2",
+    "density",
+    "speed",
+    "amount"
+   ],
+   "d": {
+    "color": "#2d3b5c",
+    "color2": "#0c1222",
+    "density": 0.5,
+    "speed": 0.3,
+    "amount": 1
+   },
+   "dur": null,
+   "text": false
+  },
+  "waves": {
+   "label": "海浪",
+   "uses": [
+    "color",
+    "color2",
+    "density",
+    "speed",
+    "amount"
+   ],
+   "d": {
+    "color": "#4cc9f0",
+    "color2": "#123a6b",
+    "density": 0.5,
+    "speed": 1,
+    "amount": 1
+   },
+   "dur": null,
+   "text": false
+  },
+  "aurora": {
+   "label": "極光",
+   "uses": [
+    "color",
+    "color2",
+    "density",
+    "speed",
+    "amount"
+   ],
+   "d": {
+    "color": "#3ef0a0",
+    "color2": "#8a5cff",
+    "density": 0.5,
+    "speed": 1,
+    "amount": 1
+   },
+   "dur": null,
+   "text": false
+  },
+  "flowfield": {
+   "label": "流場線條",
+   "uses": [
+    "color",
+    "color2",
+    "density",
+    "speed",
+    "amount"
+   ],
+   "d": {
+    "color": "#ffd166",
+    "color2": "#4cc9f0",
+    "density": 0.5,
+    "speed": 1,
+    "amount": 1
+   },
+   "dur": null,
+   "text": false
+  },
+  "mandala": {
+   "label": "萬花筒",
+   "uses": [
+    "color",
+    "color2",
+    "color3",
+    "density",
+    "speed",
+    "amount"
+   ],
+   "d": {
+    "color": "#ffd166",
+    "color2": "#ef476f",
+    "color3": "#118ab2",
+    "density": 0.5,
+    "speed": 1,
+    "amount": 1,
+    "w": 640,
+    "h": 640
+   },
+   "dur": null,
+   "text": false
+  },
+  "dotgrid": {
+   "label": "波動點陣",
+   "uses": [
+    "color",
+    "color2",
+    "density",
+    "speed",
+    "amount"
+   ],
+   "d": {
+    "color": "#ffffff",
+    "color2": "#4cc9f0",
+    "density": 0.5,
+    "speed": 1,
+    "amount": 1
+   },
+   "dur": null,
+   "text": false
+  },
+  "ripples": {
+   "label": "漣漪",
+   "uses": [
+    "color",
+    "density",
+    "speed",
+    "amount"
+   ],
+   "d": {
+    "color": "#bfefff",
+    "density": 0.4,
+    "speed": 1,
+    "amount": 1
+   },
+   "dur": null,
+   "text": false
+  },
+  "starfield": {
+   "label": "星際穿梭",
+   "uses": [
+    "color",
+    "density",
+    "speed"
+   ],
+   "d": {
+    "color": "#ffffff",
+    "density": 0.5,
+    "speed": 1
+   },
+   "dur": null,
+   "text": false
+  },
+  "sunburst": {
+   "label": "放射光芒",
+   "uses": [
+    "color",
+    "color2",
+    "density",
+    "speed"
+   ],
+   "d": {
+    "color": "#ffe08a",
+    "color2": "#ffb347",
+    "density": 0.5,
+    "speed": 1
+   },
+   "dur": null,
+   "text": false
+  }
+ },
+ "sfx": {
+  "pop": {
+   "label": "啵",
+   "dur": 0.3
+  },
+  "thud": {
+   "label": "咚（敲擊）",
+   "dur": 0.4
+  },
+  "chime": {
+   "label": "叮（鈴聲）",
+   "dur": 2.5
+  },
+  "glissando": {
+   "label": "上行琶音",
+   "dur": 1
+  },
+  "shimmer": {
+   "label": "閃亮音",
+   "dur": 2
+  },
+  "pluck": {
+   "label": "撥弦單音",
+   "dur": 1.5
+  },
+  "whoosh": {
+   "label": "咻（風聲）",
+   "dur": 0.6
+  },
+  "strike": {
+   "label": "擦火柴",
+   "dur": 0.4
+  },
+  "meow": {
+   "label": "貓叫",
+   "dur": 0.8
+  },
+  "purr": {
+   "label": "呼嚕",
+   "dur": 3
+  },
+  "sniff": {
+   "label": "嗅聞",
+   "dur": 0.6
+  },
+  "crickets": {
+   "label": "蟲鳴",
+   "dur": 6
+  },
+  "sizzle": {
+   "label": "滋滋聲",
+   "dur": 4
+  },
+  "crackle": {
+   "label": "劈啪（鞭炮）",
+   "dur": 3
+  },
+  "roll": {
+   "label": "滾動隆隆",
+   "dur": 1.5
+  }
+ },
+ "types": {
+  "shape": {
+   "label": "形狀",
+   "category": "shape",
+   "kind": "visual",
+   "props": [
+    {
+     "key": "x",
+     "label": "X",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "y",
+     "label": "Y",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "scale",
+     "label": "縮放",
+     "type": "number",
+     "default": 1,
+     "min": 0,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "rotation",
+     "label": "旋轉",
+     "type": "number",
+     "default": 0,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    },
+    {
+     "key": "opacity",
+     "label": "不透明度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "kind",
+     "label": "形狀",
+     "type": "select",
+     "default": "rect",
+     "options": [
+      {
+       "value": "rect",
+       "label": "矩形"
+      },
+      {
+       "value": "ellipse",
+       "label": "圓形"
+      },
+      {
+       "value": "triangle",
+       "label": "三角形"
+      },
+      {
+       "value": "star",
+       "label": "星形"
+      },
+      {
+       "value": "polygon",
+       "label": "多邊形"
+      },
+      {
+       "value": "heart",
+       "label": "愛心"
+      },
+      {
+       "value": "ring",
+       "label": "圓環"
+      },
+      {
+       "value": "arc",
+       "label": "扇形"
+      },
+      {
+       "value": "line",
+       "label": "線條"
+      }
+     ]
+    },
+    {
+     "key": "w",
+     "label": "寬",
+     "type": "number",
+     "default": 240,
+     "min": 1,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "h",
+     "label": "高",
+     "type": "number",
+     "default": 240,
+     "min": 1,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "fill",
+     "label": "填色",
+     "type": "color",
+     "default": "#ffcc4d",
+     "anim": true
+    },
+    {
+     "key": "gradient",
+     "label": "漸層",
+     "type": "select",
+     "default": "none",
+     "options": [
+      {
+       "value": "none",
+       "label": "無"
+      },
+      {
+       "value": "linear",
+       "label": "線性"
+      },
+      {
+       "value": "radial",
+       "label": "放射"
+      }
+     ]
+    },
+    {
+     "key": "fill2",
+     "label": "漸層色",
+     "type": "color",
+     "default": "#ff6b6b",
+     "anim": true,
+     "when": "pr.gradient !== 'none'"
+    },
+    {
+     "key": "stroke",
+     "label": "外框色",
+     "type": "color",
+     "default": "#ffffff",
+     "anim": true
+    },
+    {
+     "key": "strokeWeight",
+     "label": "外框粗細",
+     "type": "number",
+     "default": 0,
+     "min": 0,
+     "step": 0.5,
+     "anim": true
+    },
+    {
+     "key": "radius",
+     "label": "圓角",
+     "type": "number",
+     "default": 24,
+     "min": 0,
+     "step": 1,
+     "anim": true,
+     "when": "pr.kind === 'rect'"
+    },
+    {
+     "key": "points",
+     "label": "角數",
+     "type": "number",
+     "default": 5,
+     "min": 3,
+     "max": 24,
+     "step": 1,
+     "when": "pr.kind === 'star'"
+    },
+    {
+     "key": "sides",
+     "label": "邊數",
+     "type": "number",
+     "default": 6,
+     "min": 3,
+     "max": 24,
+     "step": 1,
+     "when": "pr.kind === 'polygon'"
+    },
+    {
+     "key": "inner",
+     "label": "內徑比例",
+     "type": "range",
+     "default": 0.45,
+     "min": 0.05,
+     "max": 0.95,
+     "step": 0.01,
+     "anim": true,
+     "when": "pr.kind === 'star' || pr.kind === 'ring'"
+    },
+    {
+     "key": "sweep",
+     "label": "角度",
+     "type": "range",
+     "default": 270,
+     "min": 0,
+     "max": 360,
+     "step": 1,
+     "unit": "°",
+     "anim": true,
+     "when": "pr.kind === 'arc'"
+    },
+    {
+     "key": "glow",
+     "label": "光暈",
+     "type": "number",
+     "default": 0,
+     "min": 0,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "glowColor",
+     "label": "光暈色",
+     "type": "color",
+     "default": "#ffffff",
+     "anim": true,
+     "when": "pr.glow > 0"
+    },
+    {
+     "key": "blur",
+     "label": "模糊",
+     "type": "range",
+     "default": 0,
+     "min": 0,
+     "max": 40,
+     "step": 0.5,
+     "anim": true
+    },
+    {
+     "key": "brightness",
+     "label": "亮度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "contrast",
+     "label": "對比",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "saturate",
+     "label": "飽和度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "hue",
+     "label": "色相",
+     "type": "range",
+     "default": 0,
+     "min": -180,
+     "max": 180,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    }
+   ]
+  },
+  "text": {
+   "label": "文字",
+   "category": "text",
+   "kind": "visual",
+   "props": [
+    {
+     "key": "x",
+     "label": "X",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "y",
+     "label": "Y",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "scale",
+     "label": "縮放",
+     "type": "number",
+     "default": 1,
+     "min": 0,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "rotation",
+     "label": "旋轉",
+     "type": "number",
+     "default": 0,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    },
+    {
+     "key": "opacity",
+     "label": "不透明度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "text",
+     "label": "內容",
+     "type": "textarea",
+     "default": "輸入文字"
+    },
+    {
+     "key": "font",
+     "label": "字型",
+     "type": "font",
+     "default": "Noto Sans TC"
+    },
+    {
+     "key": "weight",
+     "label": "粗細",
+     "type": "select",
+     "default": 700,
+     "options": [
+      {
+       "value": 400,
+       "label": "一般"
+      },
+      {
+       "value": 700,
+       "label": "粗"
+      },
+      {
+       "value": 900,
+       "label": "特粗"
+      }
+     ]
+    },
+    {
+     "key": "size",
+     "label": "字級",
+     "type": "number",
+     "default": 72,
+     "min": 4,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "fill",
+     "label": "文字色",
+     "type": "color",
+     "default": "#ffffff",
+     "anim": true
+    },
+    {
+     "key": "stroke",
+     "label": "描邊色",
+     "type": "color",
+     "default": "#000000",
+     "anim": true
+    },
+    {
+     "key": "strokeWeight",
+     "label": "描邊粗細",
+     "type": "number",
+     "default": 0,
+     "min": 0,
+     "step": 0.5,
+     "anim": true
+    },
+    {
+     "key": "align",
+     "label": "對齊",
+     "type": "select",
+     "default": "center",
+     "options": [
+      {
+       "value": "left",
+       "label": "靠左"
+      },
+      {
+       "value": "center",
+       "label": "置中"
+      },
+      {
+       "value": "right",
+       "label": "靠右"
+      }
+     ]
+    },
+    {
+     "key": "letterSpacing",
+     "label": "字距",
+     "type": "number",
+     "default": 0,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "lineHeight",
+     "label": "行高",
+     "type": "number",
+     "default": 1.3,
+     "min": 0.5,
+     "step": 0.05
+    },
+    {
+     "key": "glow",
+     "label": "光暈",
+     "type": "number",
+     "default": 0,
+     "min": 0,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "glowColor",
+     "label": "光暈色",
+     "type": "color",
+     "default": "#ffd27a",
+     "anim": true,
+     "when": "pr.glow > 0"
+    },
+    {
+     "key": "blur",
+     "label": "模糊",
+     "type": "range",
+     "default": 0,
+     "min": 0,
+     "max": 40,
+     "step": 0.5,
+     "anim": true
+    },
+    {
+     "key": "brightness",
+     "label": "亮度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "contrast",
+     "label": "對比",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "saturate",
+     "label": "飽和度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "hue",
+     "label": "色相",
+     "type": "range",
+     "default": 0,
+     "min": -180,
+     "max": 180,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    }
+   ]
+  },
+  "image": {
+   "label": "圖片",
+   "category": "media",
+   "kind": "visual",
+   "props": [
+    {
+     "key": "x",
+     "label": "X",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "y",
+     "label": "Y",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "scale",
+     "label": "縮放",
+     "type": "number",
+     "default": 1,
+     "min": 0,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "rotation",
+     "label": "旋轉",
+     "type": "number",
+     "default": 0,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    },
+    {
+     "key": "opacity",
+     "label": "不透明度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "asset",
+     "label": "圖片",
+     "type": "asset",
+     "accept": "image"
+    },
+    {
+     "key": "w",
+     "label": "寬",
+     "type": "number",
+     "default": 400,
+     "min": 1,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "flipX",
+     "label": "水平翻轉",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "key": "radius",
+     "label": "圓角",
+     "type": "number",
+     "default": 0,
+     "min": 0,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "glow",
+     "label": "陰影／光暈",
+     "type": "number",
+     "default": 0,
+     "min": 0,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "glowColor",
+     "label": "光暈色",
+     "type": "color",
+     "default": "#000000aa",
+     "anim": true,
+     "when": "pr.glow > 0"
+    },
+    {
+     "key": "blur",
+     "label": "模糊",
+     "type": "range",
+     "default": 0,
+     "min": 0,
+     "max": 40,
+     "step": 0.5,
+     "anim": true
+    },
+    {
+     "key": "brightness",
+     "label": "亮度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "contrast",
+     "label": "對比",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "saturate",
+     "label": "飽和度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "hue",
+     "label": "色相",
+     "type": "range",
+     "default": 0,
+     "min": -180,
+     "max": 180,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    }
+   ]
+  },
+  "code": {
+   "label": "程式碼",
+   "category": "code",
+   "kind": "visual",
+   "props": [
+    {
+     "key": "x",
+     "label": "X",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "y",
+     "label": "Y",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "scale",
+     "label": "縮放",
+     "type": "number",
+     "default": 1,
+     "min": 0,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "rotation",
+     "label": "旋轉",
+     "type": "number",
+     "default": 0,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    },
+    {
+     "key": "opacity",
+     "label": "不透明度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "code",
+     "label": "p5 程式碼",
+     "type": "code",
+     "default": "// p = p5 instance, t = seconds since this clip started, env.W / env.H = canvas size\n// Draw around (0, 0). Position, scale and in/out animations come from the clip.\np.noFill();\np.strokeWeight(4);\nfor (let i = 0; i < 10; i++) {\n  p.stroke(255, 180 + i * 7, 80, 220 - i * 18);\n  const r = 40 + i * 16 + Math.sin(t * 2 + i * 0.6) * 10;\n  p.circle(0, 0, r * 2);\n}"
+    },
+    {
+     "key": "w",
+     "label": "範圍寬",
+     "type": "number",
+     "default": 400,
+     "min": 1,
+     "step": 1
+    },
+    {
+     "key": "h",
+     "label": "範圍高",
+     "type": "number",
+     "default": 400,
+     "min": 1,
+     "step": 1
+    },
+    {
+     "key": "blur",
+     "label": "模糊",
+     "type": "range",
+     "default": 0,
+     "min": 0,
+     "max": 40,
+     "step": 0.5,
+     "anim": true
+    },
+    {
+     "key": "brightness",
+     "label": "亮度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "contrast",
+     "label": "對比",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "saturate",
+     "label": "飽和度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "hue",
+     "label": "色相",
+     "type": "range",
+     "default": 0,
+     "min": -180,
+     "max": 180,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    }
+   ]
+  },
+  "legacy": {
+   "label": "舊版動畫",
+   "category": "media",
+   "kind": "visual",
+   "props": [
+    {
+     "key": "x",
+     "label": "X",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "y",
+     "label": "Y",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "scale",
+     "label": "縮放",
+     "type": "number",
+     "default": 1,
+     "min": 0,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "rotation",
+     "label": "旋轉",
+     "type": "number",
+     "default": 0,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    },
+    {
+     "key": "opacity",
+     "label": "不透明度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "asset",
+     "label": "來源",
+     "type": "asset",
+     "accept": "legacy"
+    },
+    {
+     "key": "blur",
+     "label": "模糊",
+     "type": "range",
+     "default": 0,
+     "min": 0,
+     "max": 40,
+     "step": 0.5,
+     "anim": true
+    },
+    {
+     "key": "brightness",
+     "label": "亮度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "contrast",
+     "label": "對比",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "saturate",
+     "label": "飽和度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "hue",
+     "label": "色相",
+     "type": "range",
+     "default": 0,
+     "min": -180,
+     "max": 180,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    }
+   ]
+  },
+  "particles": {
+   "label": "粒子",
+   "category": "particles",
+   "kind": "visual",
+   "props": [
+    {
+     "key": "x",
+     "label": "X",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "y",
+     "label": "Y",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "scale",
+     "label": "縮放",
+     "type": "number",
+     "default": 1,
+     "min": 0,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "rotation",
+     "label": "旋轉",
+     "type": "number",
+     "default": 0,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    },
+    {
+     "key": "opacity",
+     "label": "不透明度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "preset",
+     "label": "效果",
+     "type": "select",
+     "default": "snow",
+     "options": [
+      {
+       "value": "snow",
+       "label": "雪花"
+      },
+      {
+       "value": "rain",
+       "label": "雨"
+      },
+      {
+       "value": "sakura",
+       "label": "櫻花"
+      },
+      {
+       "value": "leaves",
+       "label": "落葉"
+      },
+      {
+       "value": "confetti",
+       "label": "彩色紙花"
+      },
+      {
+       "value": "bubbles",
+       "label": "泡泡"
+      },
+      {
+       "value": "embers",
+       "label": "火星"
+      },
+      {
+       "value": "lanterns",
+       "label": "天燈"
+      },
+      {
+       "value": "hearts",
+       "label": "愛心飄升"
+      },
+      {
+       "value": "fireflies",
+       "label": "螢火蟲"
+      },
+      {
+       "value": "dust",
+       "label": "光塵"
+      },
+      {
+       "value": "stars",
+       "label": "星星閃爍"
+      },
+      {
+       "value": "fog",
+       "label": "霧氣"
+      },
+      {
+       "value": "fireworks",
+       "label": "煙火"
+      }
+     ]
+    },
+    {
+     "key": "count",
+     "label": "數量",
+     "type": "number",
+     "default": 180,
+     "min": 0,
+     "max": 2000,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "size",
+     "label": "大小",
+     "type": "number",
+     "default": 7,
+     "min": 0.5,
+     "step": 0.5,
+     "anim": true
+    },
+    {
+     "key": "speed",
+     "label": "速度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 4,
+     "step": 0.05,
+     "anim": true
+    },
+    {
+     "key": "wind",
+     "label": "風向",
+     "type": "range",
+     "default": 0.3,
+     "min": -3,
+     "max": 3,
+     "step": 0.05,
+     "anim": true
+    },
+    {
+     "key": "color",
+     "label": "顏色 1",
+     "type": "color",
+     "default": "#ffffff",
+     "anim": true
+    },
+    {
+     "key": "color2",
+     "label": "顏色 2",
+     "type": "color",
+     "default": "#d6e9ff",
+     "anim": true
+    },
+    {
+     "key": "w",
+     "label": "範圍寬",
+     "type": "number",
+     "default": "$width",
+     "min": 1,
+     "step": 1
+    },
+    {
+     "key": "h",
+     "label": "範圍高",
+     "type": "number",
+     "default": "$height",
+     "min": 1,
+     "step": 1
+    },
+    {
+     "key": "seed",
+     "label": "隨機種子",
+     "type": "number",
+     "default": 1,
+     "step": 1
+    },
+    {
+     "key": "blur",
+     "label": "模糊",
+     "type": "range",
+     "default": 0,
+     "min": 0,
+     "max": 40,
+     "step": 0.5,
+     "anim": true
+    },
+    {
+     "key": "brightness",
+     "label": "亮度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "contrast",
+     "label": "對比",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "saturate",
+     "label": "飽和度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "hue",
+     "label": "色相",
+     "type": "range",
+     "default": 0,
+     "min": -180,
+     "max": 180,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    }
+   ]
+  },
+  "gen": {
+   "label": "生成藝術",
+   "category": "gen",
+   "kind": "visual",
+   "props": [
+    {
+     "key": "x",
+     "label": "X",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "y",
+     "label": "Y",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "scale",
+     "label": "縮放",
+     "type": "number",
+     "default": 1,
+     "min": 0,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "rotation",
+     "label": "旋轉",
+     "type": "number",
+     "default": 0,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    },
+    {
+     "key": "opacity",
+     "label": "不透明度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "preset",
+     "label": "樣式",
+     "type": "select",
+     "default": "gradientSky",
+     "options": [
+      {
+       "value": "gradientSky",
+       "label": "漸層天空"
+      },
+      {
+       "value": "moon",
+       "label": "明月"
+      },
+      {
+       "value": "clouds",
+       "label": "雲朵"
+      },
+      {
+       "value": "mountains",
+       "label": "層疊山巒"
+      },
+      {
+       "value": "waves",
+       "label": "海浪"
+      },
+      {
+       "value": "aurora",
+       "label": "極光"
+      },
+      {
+       "value": "flowfield",
+       "label": "流場線條"
+      },
+      {
+       "value": "mandala",
+       "label": "萬花筒"
+      },
+      {
+       "value": "dotgrid",
+       "label": "波動點陣"
+      },
+      {
+       "value": "ripples",
+       "label": "漣漪"
+      },
+      {
+       "value": "starfield",
+       "label": "星際穿梭"
+      },
+      {
+       "value": "sunburst",
+       "label": "放射光芒"
+      }
+     ]
+    },
+    {
+     "key": "color",
+     "label": "顏色 1",
+     "type": "color",
+     "default": "#0b1a3a",
+     "anim": true,
+     "when": "preset-uses"
+    },
+    {
+     "key": "color2",
+     "label": "顏色 2",
+     "type": "color",
+     "default": "#4a3a78",
+     "anim": true,
+     "when": "preset-uses"
+    },
+    {
+     "key": "color3",
+     "label": "顏色 3",
+     "type": "color",
+     "default": "#f29b76",
+     "anim": true,
+     "when": "preset-uses"
+    },
+    {
+     "key": "density",
+     "label": "密度",
+     "type": "range",
+     "default": 0.5,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "when": "preset-uses"
+    },
+    {
+     "key": "speed",
+     "label": "速度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 4,
+     "step": 0.05,
+     "anim": true
+    },
+    {
+     "key": "amount",
+     "label": "強度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 2,
+     "step": 0.01,
+     "anim": true,
+     "when": "preset-uses"
+    },
+    {
+     "key": "w",
+     "label": "範圍寬",
+     "type": "number",
+     "default": "$width",
+     "min": 1,
+     "step": 1
+    },
+    {
+     "key": "h",
+     "label": "範圍高",
+     "type": "number",
+     "default": "$height",
+     "min": 1,
+     "step": 1
+    },
+    {
+     "key": "seed",
+     "label": "隨機種子",
+     "type": "number",
+     "default": 1,
+     "step": 1
+    },
+    {
+     "key": "blur",
+     "label": "模糊",
+     "type": "range",
+     "default": 0,
+     "min": 0,
+     "max": 40,
+     "step": 0.5,
+     "anim": true
+    },
+    {
+     "key": "brightness",
+     "label": "亮度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "contrast",
+     "label": "對比",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "saturate",
+     "label": "飽和度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "hue",
+     "label": "色相",
+     "type": "range",
+     "default": 0,
+     "min": -180,
+     "max": 180,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    }
+   ]
+  },
+  "shape3d": {
+   "label": "3D 物件",
+   "category": "3d",
+   "kind": "visual",
+   "props": [
+    {
+     "key": "x",
+     "label": "X",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "y",
+     "label": "Y",
+     "type": "number",
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "scale",
+     "label": "縮放",
+     "type": "number",
+     "default": 1,
+     "min": 0,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "rotation",
+     "label": "旋轉",
+     "type": "number",
+     "default": 0,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    },
+    {
+     "key": "opacity",
+     "label": "不透明度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "kind",
+     "label": "形狀",
+     "type": "select",
+     "default": "box",
+     "options": [
+      {
+       "value": "box",
+       "label": "立方體"
+      },
+      {
+       "value": "sphere",
+       "label": "球體"
+      },
+      {
+       "value": "torus",
+       "label": "甜甜圈"
+      },
+      {
+       "value": "cone",
+       "label": "圓錐"
+      },
+      {
+       "value": "cylinder",
+       "label": "圓柱"
+      },
+      {
+       "value": "ellipsoid",
+       "label": "橢球"
+      },
+      {
+       "value": "plane",
+       "label": "平面卡片"
+      }
+     ]
+    },
+    {
+     "key": "size",
+     "label": "尺寸",
+     "type": "number",
+     "default": 220,
+     "min": 1,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "color",
+     "label": "顏色",
+     "type": "color",
+     "default": "#ff8a5c",
+     "anim": true
+    },
+    {
+     "key": "material",
+     "label": "材質",
+     "type": "select",
+     "default": "lit",
+     "options": [
+      {
+       "value": "lit",
+       "label": "霧面"
+      },
+      {
+       "value": "specular",
+       "label": "亮面"
+      },
+      {
+       "value": "normal",
+       "label": "彩虹法線"
+      },
+      {
+       "value": "wireframe",
+       "label": "線框"
+      }
+     ]
+    },
+    {
+     "key": "texture",
+     "label": "貼圖",
+     "type": "asset",
+     "accept": "image",
+     "when": "pr.material === 'lit'"
+    },
+    {
+     "key": "ambient",
+     "label": "環境光",
+     "type": "range",
+     "default": 0.35,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "spinX",
+     "label": "X 自轉（°/秒）",
+     "type": "number",
+     "default": 20,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "spinY",
+     "label": "Y 自轉（°/秒）",
+     "type": "number",
+     "default": 40,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "spinZ",
+     "label": "Z 自轉（°/秒）",
+     "type": "number",
+     "default": 0,
+     "step": 1,
+     "anim": true
+    },
+    {
+     "key": "tiltX",
+     "label": "X 傾斜",
+     "type": "number",
+     "default": -20,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    },
+    {
+     "key": "tiltY",
+     "label": "Y 傾斜",
+     "type": "number",
+     "default": 30,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    },
+    {
+     "key": "tiltZ",
+     "label": "Z 傾斜",
+     "type": "number",
+     "default": 0,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    },
+    {
+     "key": "detail",
+     "label": "細緻度",
+     "type": "number",
+     "default": 24,
+     "min": 6,
+     "max": 48,
+     "step": 1
+    },
+    {
+     "key": "blur",
+     "label": "模糊",
+     "type": "range",
+     "default": 0,
+     "min": 0,
+     "max": 40,
+     "step": 0.5,
+     "anim": true
+    },
+    {
+     "key": "brightness",
+     "label": "亮度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "contrast",
+     "label": "對比",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "saturate",
+     "label": "飽和度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "hue",
+     "label": "色相",
+     "type": "range",
+     "default": 0,
+     "min": -180,
+     "max": 180,
+     "step": 1,
+     "unit": "°",
+     "anim": true
+    }
+   ]
+  },
+  "fx_vignette": {
+   "label": "暗角",
+   "category": "effect",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "amount",
+     "label": "強度",
+     "type": "range",
+     "default": 0.55,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "color",
+     "label": "顏色",
+     "type": "color",
+     "default": "#000000",
+     "anim": true
+    },
+    {
+     "key": "size",
+     "label": "範圍",
+     "type": "range",
+     "default": 0.45,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    }
+   ]
+  },
+  "fx_grain": {
+   "label": "底片顆粒",
+   "category": "effect",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "amount",
+     "label": "強度",
+     "type": "range",
+     "default": 0.3,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    }
+   ]
+  },
+  "fx_grade": {
+   "label": "調色",
+   "category": "effect",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "sepia",
+     "label": "懷舊",
+     "type": "range",
+     "default": 0,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "grayscale",
+     "label": "黑白",
+     "type": "range",
+     "default": 0,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    }
+   ]
+  },
+  "fx_blur": {
+   "label": "畫面模糊",
+   "category": "effect",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "amount",
+     "label": "模糊程度",
+     "type": "range",
+     "default": 8,
+     "min": 0,
+     "max": 40,
+     "step": 0.5,
+     "anim": true
+    }
+   ]
+  },
+  "fx_glow": {
+   "label": "柔焦光暈",
+   "category": "effect",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "amount",
+     "label": "強度",
+     "type": "range",
+     "default": 0.5,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "radius",
+     "label": "光暈大小",
+     "type": "range",
+     "default": 18,
+     "min": 1,
+     "max": 60,
+     "step": 1,
+     "anim": true
+    }
+   ]
+  },
+  "fx_tint": {
+   "label": "色彩濾鏡",
+   "category": "effect",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "amount",
+     "label": "強度",
+     "type": "range",
+     "default": 0.35,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "color",
+     "label": "顏色",
+     "type": "color",
+     "default": "#ff9a3c",
+     "anim": true
+    },
+    {
+     "key": "mode",
+     "label": "混合",
+     "type": "select",
+     "default": "soft-light",
+     "options": [
+      {
+       "value": "multiply",
+       "label": "色彩增值"
+      },
+      {
+       "value": "screen",
+       "label": "濾色"
+      },
+      {
+       "value": "overlay",
+       "label": "覆蓋"
+      },
+      {
+       "value": "soft-light",
+       "label": "柔光"
+      },
+      {
+       "value": "color",
+       "label": "顏色"
+      },
+      {
+       "value": "source-over",
+       "label": "一般"
+      }
+     ]
+    }
+   ]
+  },
+  "fx_lightLeak": {
+   "label": "漏光",
+   "category": "effect",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "amount",
+     "label": "強度",
+     "type": "range",
+     "default": 0.5,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "color",
+     "label": "顏色 1",
+     "type": "color",
+     "default": "#ff7a3c",
+     "anim": true
+    },
+    {
+     "key": "color2",
+     "label": "顏色 2",
+     "type": "color",
+     "default": "#ffd36b",
+     "anim": true
+    },
+    {
+     "key": "speed",
+     "label": "速度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 3,
+     "step": 0.05
+    }
+   ]
+  },
+  "fx_fade": {
+   "label": "黑場淡入淡出",
+   "category": "effect",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "color",
+     "label": "顏色",
+     "type": "color",
+     "default": "#000000",
+     "anim": true
+    },
+    {
+     "key": "mode",
+     "label": "方向",
+     "type": "select",
+     "default": "out",
+     "options": [
+      {
+       "value": "out",
+       "label": "畫面漸漸變成顏色"
+      },
+      {
+       "value": "in",
+       "label": "由顏色漸漸出現"
+      }
+     ]
+    }
+   ]
+  },
+  "fx_flash": {
+   "label": "閃白",
+   "category": "effect",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "amount",
+     "label": "強度",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 1,
+     "step": 0.01,
+     "anim": true
+    },
+    {
+     "key": "color",
+     "label": "顏色",
+     "type": "color",
+     "default": "#ffffff",
+     "anim": true
+    }
+   ]
+  },
+  "fx_letterbox": {
+   "label": "電影黑邊",
+   "category": "effect",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "ratio",
+     "label": "畫面比例",
+     "type": "select",
+     "default": 2.35,
+     "options": [
+      {
+       "value": 2.35,
+       "label": "2.35：1"
+      },
+      {
+       "value": 2,
+       "label": "2：1"
+      },
+      {
+       "value": 1.85,
+       "label": "1.85：1"
+      }
+     ]
+    },
+    {
+     "key": "color",
+     "label": "顏色",
+     "type": "color",
+     "default": "#000000"
+    }
+   ]
+  },
+  "tr_fadeThrough": {
+   "label": "淡化過場",
+   "category": "transition",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "color",
+     "label": "顏色",
+     "type": "color",
+     "default": "#000000"
+    }
+   ]
+  },
+  "tr_wipe": {
+   "label": "推移擦除",
+   "category": "transition",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "color",
+     "label": "顏色",
+     "type": "color",
+     "default": "#111111"
+    },
+    {
+     "key": "dir",
+     "label": "方向",
+     "type": "select",
+     "default": "right",
+     "options": [
+      {
+       "value": "right",
+       "label": "向右"
+      },
+      {
+       "value": "left",
+       "label": "向左"
+      },
+      {
+       "value": "down",
+       "label": "向下"
+      },
+      {
+       "value": "up",
+       "label": "向上"
+      }
+     ]
+    }
+   ]
+  },
+  "tr_iris": {
+   "label": "圓形轉場",
+   "category": "transition",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "color",
+     "label": "顏色",
+     "type": "color",
+     "default": "#000000"
+    }
+   ]
+  },
+  "tr_blinds": {
+   "label": "百葉窗",
+   "category": "transition",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "color",
+     "label": "顏色",
+     "type": "color",
+     "default": "#000000"
+    },
+    {
+     "key": "count",
+     "label": "葉片數",
+     "type": "number",
+     "default": 10,
+     "min": 2,
+     "max": 40,
+     "step": 1
+    }
+   ]
+  },
+  "tr_zoom": {
+   "label": "衝擊縮放",
+   "category": "transition",
+   "kind": "screen",
+   "props": [
+    {
+     "key": "amount",
+     "label": "強度",
+     "type": "range",
+     "default": 0.5,
+     "min": 0,
+     "max": 1,
+     "step": 0.01
+    }
+   ]
+  },
+  "music": {
+   "label": "配樂",
+   "category": "audio",
+   "kind": "audio",
+   "props": [
+    {
+     "key": "preset",
+     "label": "曲風",
+     "type": "select",
+     "default": "warm",
+     "options": [
+      {
+       "value": "warm",
+       "label": "溫馨"
+      },
+      {
+       "value": "festive",
+       "label": "喜慶"
+      },
+      {
+       "value": "calm",
+       "label": "寧靜"
+      },
+      {
+       "value": "romantic",
+       "label": "浪漫"
+      },
+      {
+       "value": "happy",
+       "label": "歡樂"
+      },
+      {
+       "value": "mystery",
+       "label": "神秘"
+      },
+      {
+       "value": "score",
+       "label": "匯入的樂譜"
+      }
+     ]
+    },
+    {
+     "key": "seed",
+     "label": "旋律變化",
+     "type": "number",
+     "default": 1,
+     "step": 1,
+     "when": "pr.preset !== 'score'"
+    },
+    {
+     "key": "volume",
+     "label": "音量",
+     "type": "range",
+     "default": 0.8,
+     "min": 0,
+     "max": 2,
+     "step": 0.01
+    },
+    {
+     "key": "fadeIn",
+     "label": "淡入（秒）",
+     "type": "number",
+     "default": 0,
+     "min": 0,
+     "step": 0.1
+    },
+    {
+     "key": "fadeOut",
+     "label": "淡出（秒）",
+     "type": "number",
+     "default": 1.5,
+     "min": 0,
+     "step": 0.1
+    }
+   ]
+  },
+  "sfx": {
+   "label": "音效",
+   "category": "audio",
+   "kind": "audio",
+   "props": [
+    {
+     "key": "voice",
+     "label": "音效",
+     "type": "select",
+     "default": "pop",
+     "options": [
+      {
+       "value": "pop",
+       "label": "啵"
+      },
+      {
+       "value": "thud",
+       "label": "咚（敲擊）"
+      },
+      {
+       "value": "chime",
+       "label": "叮（鈴聲）"
+      },
+      {
+       "value": "glissando",
+       "label": "上行琶音"
+      },
+      {
+       "value": "shimmer",
+       "label": "閃亮音"
+      },
+      {
+       "value": "pluck",
+       "label": "撥弦單音"
+      },
+      {
+       "value": "whoosh",
+       "label": "咻（風聲）"
+      },
+      {
+       "value": "strike",
+       "label": "擦火柴"
+      },
+      {
+       "value": "meow",
+       "label": "貓叫"
+      },
+      {
+       "value": "purr",
+       "label": "呼嚕"
+      },
+      {
+       "value": "sniff",
+       "label": "嗅聞"
+      },
+      {
+       "value": "crickets",
+       "label": "蟲鳴"
+      },
+      {
+       "value": "sizzle",
+       "label": "滋滋聲"
+      },
+      {
+       "value": "crackle",
+       "label": "劈啪（鞭炮）"
+      },
+      {
+       "value": "roll",
+       "label": "滾動隆隆"
+      }
+     ]
+    },
+    {
+     "key": "pitch",
+     "label": "音高",
+     "type": "range",
+     "default": 1,
+     "min": 0.4,
+     "max": 2.5,
+     "step": 0.01,
+     "when": "pr.voice === 'meow' || pr.voice === 'thud'"
+    },
+    {
+     "key": "note",
+     "label": "音符（MIDI）",
+     "type": "number",
+     "default": 72,
+     "min": 24,
+     "max": 108,
+     "step": 1,
+     "when": "pr.voice === 'pluck'"
+    },
+    {
+     "key": "up",
+     "label": "上升",
+     "type": "bool",
+     "default": true,
+     "when": "pr.voice === 'whoosh'"
+    },
+    {
+     "key": "count",
+     "label": "次數",
+     "type": "number",
+     "default": 3,
+     "min": 1,
+     "max": 12,
+     "step": 1,
+     "when": "pr.voice === 'sniff'"
+    },
+    {
+     "key": "density",
+     "label": "密度（次/秒）",
+     "type": "number",
+     "default": 6,
+     "min": 0.5,
+     "max": 40,
+     "step": 0.5,
+     "when": "pr.voice === 'crackle'"
+    },
+    {
+     "key": "volume",
+     "label": "音量",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 2,
+     "step": 0.01
+    }
+   ]
+  },
+  "audiofile": {
+   "label": "音訊檔",
+   "category": "audio",
+   "kind": "audio",
+   "props": [
+    {
+     "key": "asset",
+     "label": "音訊",
+     "type": "asset",
+     "accept": "audio"
+    },
+    {
+     "key": "volume",
+     "label": "音量",
+     "type": "range",
+     "default": 1,
+     "min": 0,
+     "max": 2,
+     "step": 0.01
+    },
+    {
+     "key": "fadeIn",
+     "label": "淡入（秒）",
+     "type": "number",
+     "default": 0,
+     "min": 0,
+     "step": 0.1
+    },
+    {
+     "key": "fadeOut",
+     "label": "淡出（秒）",
+     "type": "number",
+     "default": 0,
+     "min": 0,
+     "step": 0.1
+    }
+   ]
+  }
+ }
+}
