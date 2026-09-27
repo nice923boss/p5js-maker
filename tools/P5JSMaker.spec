@@ -11,6 +11,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (os.path.join(ROOT, 'index.html'), '.'),
+        (os.path.join(ROOT, 'help.html'), '.'),
         (os.path.join(ROOT, 'css'), 'css'),
         (os.path.join(ROOT, 'js'), 'js'),
         (os.path.join(ROOT, 'runtime'), 'runtime'),

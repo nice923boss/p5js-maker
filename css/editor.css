@@ -46,6 +46,7 @@ i[data-icon] { display: inline-flex; font-style: normal; }
 .tb-group { display: flex; align-items: center; gap: 4px; }
 .tb-group.right { margin-left: auto; }
 .tb-btn, .tb-icon { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; cursor: pointer; white-space: nowrap; }
+a.tb-btn { color: inherit; text-decoration: none; }
 .tb-icon { width: 30px; padding: 0; justify-content: center; }
 .tb-btn:hover, .tb-icon:hover { background: var(--panel-3); }
 .tb-btn:disabled, .tb-icon:disabled { opacity: .35; cursor: default; background: transparent; }
