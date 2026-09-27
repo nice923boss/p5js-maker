@@ -93,7 +93,8 @@
       for (const id of used) {
         const a = project.assets[id];
         if (!a) continue;
-        if (a.kind === 'image') { api.image(a); jobs.push(waitFor(() => images.get(a.id).ready || images.get(a.id).error)); }
+        // The entry vanishes if release() runs because another project opened meanwhile; stop waiting then
+        if (a.kind === 'image') { api.image(a); jobs.push(waitFor(() => { const e = images.get(a.id); return !e || e.ready || e.error; })); }
         if (a.kind === 'audio') jobs.push(api.audioBuffer(a));
         if (a.kind === 'legacy') jobs.push(api.legacy(a).promise);
       }
