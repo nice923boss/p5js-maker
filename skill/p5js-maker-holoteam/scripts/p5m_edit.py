@@ -3,7 +3,7 @@ import math
 
 from p5m_core import (
     EPS, CliError, coerce, default_props, extend_duration, find_track, kind_of, new_track, next_id, num, parse_pairs,
-    pick_track, preset_props, prop_def, read_asset, require_clip, round_t, schema, type_def,
+    pick_track, preset_props, prop_def, read_asset, require_clip, round_t, schema, text_spacing, type_def,
 )
 
 KEY_EPS = 1e-3
@@ -133,7 +133,10 @@ def add(project, type_name, start, dur=None, track=None, name=None, bg=None, pai
     tdef = type_def(type_name)
     clip = {"id": "", "type": type_name, "name": name or tdef["label"], "start": num(round_t(max(0, start))), "duration": 0,
             "offset": 0, "props": default_props(type_name, project["settings"]), "keys": {}, "anim": {}, "blend": "source-over"}
-    clip["props"].update(apply_pairs(clip, parse_pairs(pairs)))
+    given = apply_pairs(clip, parse_pairs(pairs))
+    clip["props"].update(given)
+    if type_name == "text" and "letterSpacing" not in given:
+        clip["props"]["letterSpacing"] = text_spacing(clip["props"])
     clip["duration"] = num(round_t(dur if dur else default_duration(project, type_name, clip["props"], start)))
     background = bg if bg is not None else (type_name == "gen" and is_fill(type_name, clip["props"]))
     tr = pick_track(project, kind_of(type_name), clip["start"], clip["duration"], track, background)

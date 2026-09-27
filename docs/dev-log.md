@@ -224,3 +224,15 @@ repo `nice923boss/p5js-maker`（公開、MIT），Pages 從 `main` 根目錄提�
 測試中發現並修正：匯入音樂不給 `--dur` 只放 4 秒（腳本讀不出音訊長度），SKILL 與 API.md 改為要求一律帶 `--dur`（G25）；分鏡範例原本 5 場與 1 分鐘 plan 建議的 4 場不一致，改成 4 場。
 
 未驗證：HoloTeam 小模型實際觸發與對話（G23）、FLUX.2 klein 生圖（G24）。
+
+## 2026-09-27 文字預設字距
+
+文字是逐字排版，描邊會吃掉字與字的空隙，字距 0 時字幕看起來擠在一起。新增文字時改為依字級與描邊帶入字距：`round(size × 0.06 + strokeWeight × 0.5)`，最少 1。屬性預設值仍是 0，沒寫字距的舊專案開啟後外觀不變。
+
+| 位置 | 改動 |
+|---|---|
+| `js/library.js` | 文字面板加入的圖層帶入字距（大標題 7、英文標題 6、字幕 5） |
+| `skill/p5js-maker-holoteam/scripts` | `p5m_core.text_spacing`，build 與 `add text` 沒指定字距時帶入 |
+| `skill/p5js-maker/SKILL.md` | 骨架範例加字距，常見錯誤表加一列，版本 1.1.0 |
+
+驗證：編輯器從原始碼載入，加入字幕、大標題、英文標題，讀回字距 5、7、6，畫面無異常；`p5m add text size=64 strokeWeight=4` 得 6；`p5m build templates/storyboard_example.json` 字幕 3、標題 7，檢查 0 錯誤 0 警告。exe 已重建（9,111,365 bytes），未實際啟動（38920 連接埠被使用中的編輯器佔用）。Release v1.0.0 的 exe 仍是舊版。

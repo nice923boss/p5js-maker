@@ -181,6 +181,12 @@ def default_props(type_name: str, settings: dict) -> dict:
     return out
 
 
+def text_spacing(props: dict) -> float:
+    """Default letterSpacing for a text layer (same rule as the editor's text library): glyphs are laid out
+    one by one and the stroke eats the gaps, so scale with size and stroke."""
+    return num(max(1, round(props.get("size", 72) * 0.06 + props.get("strokeWeight", 0) * 0.5)))
+
+
 def preset_props(type_name: str, preset: str) -> dict:
     """The values the editor copies into props when a particle or gen preset is picked."""
     table = schema()["particlePresets"] if type_name == "particles" else schema()["genPresets"] if type_name == "gen" else None

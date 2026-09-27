@@ -149,6 +149,8 @@ const BUILD = {
     return [section('點一下加入，雙擊畫面上的文字可直接改內容'), grid(TEXTS.map((t) => card(() => {
       const props = t.item();
       if (props.size) props.size = Math.round(props.size);
+      // glyphs are laid out one by one and the stroke eats the gaps, so start with spacing scaled to size and stroke
+      if (props.letterSpacing === undefined) props.letterSpacing = Math.max(1, Math.round(props.size * 0.06 + (props.strokeWeight || 0) * 0.5));
       return { type: 'text', name: t.label, props, anim: t.anim };
     }, t.label, {
       cls: '.text-card',

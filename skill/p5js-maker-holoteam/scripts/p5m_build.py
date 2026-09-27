@@ -6,7 +6,7 @@ import json
 import re
 from pathlib import Path
 
-from p5m_core import CliError, default_props, new_project, num, preset_props, read_asset, round_t, schema
+from p5m_core import CliError, default_props, new_project, num, preset_props, read_asset, round_t, schema, text_spacing
 
 SIZES = {"16:9": (1280, 720), "9:16": (720, 1280), "1:1": (1080, 1080)}
 THEMES = {
@@ -136,6 +136,8 @@ class Builder:
         c = {"id": f"c{self.n}", "type": type_name, "name": name, "start": num(round_t(start)), "duration": num(round_t(dur)),
              "offset": 0, "props": {**default_props(type_name, self.p["settings"]), **(props or {})}, "keys": {}, "anim": anim or {},
              "blend": "source-over"}
+        if type_name == "text" and "letterSpacing" not in (props or {}):
+            c["props"]["letterSpacing"] = text_spacing(c["props"])
         self.tracks[track]["clips"].append(c)
         return c
 

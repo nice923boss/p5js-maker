@@ -5,7 +5,7 @@ description: >
   附驗證工具（檢查屬性、渲染取樣畫面、產生總覽圖）與獨立播放 HTML 匯出。
   觸發：使用者提到 P5JS Maker、p5maker、「做成能在時間軸編輯的動畫」、「產生 P5JS Maker 專案檔」、要把動畫交給編輯器繼續改。
   不觸發：一般「做一支 p5 動畫／節日動畫」且沒提到 P5JS Maker；修改 P5JS Maker 編輯器本身的程式碼。
-version: 1.0.0
+version: 1.1.0
 ---
 
 # P5JS Maker 專案產生
@@ -50,7 +50,7 @@ version: 1.0.0
   "tracks": [
     { "id": "tr_text", "name": "文字", "kind": "visual", "clips": [
       { "id": "c_title", "type": "text", "name": "標題", "start": 0.5, "duration": 7,
-        "props": { "text": "中秋快樂", "font": "Noto Serif TC", "weight": 900, "size": 110, "fill": "#fff3c4", "y": 300, "glow": 20 },
+        "props": { "text": "中秋快樂", "font": "Noto Serif TC", "weight": 900, "size": 110, "fill": "#fff3c4", "y": 300, "glow": 20, "letterSpacing": 7 },
         "anim": { "in": { "type": "rise", "dur": 1.2 }, "out": { "type": "fade", "dur": 0.8 }, "loop": { "type": "float", "speed": 0.6, "amount": 0.5 } } }
     ] },
     { "id": "tr_fx", "name": "粒子", "kind": "visual", "clips": [
@@ -87,6 +87,7 @@ version: 1.0.0
 | 錯誤寫法 | 正確寫法 |
 |---|---|
 | `"fill": "white"`、`"gold"` 等顏色名稱 | 只用 `#rrggbb`、`#rrggbbaa`、`rgb()`、`rgba()` |
+| 文字不寫 `letterSpacing`（預設 0） | 字是逐字排版，描邊會吃掉字與字的空隙，看起來擠在一起。每個 `text` 圖層都寫字距：`round(size × 0.06 + strokeWeight × 0.5)`，最少 1（字級 30、描邊 6 約 5；字級 110 無描邊約 7） |
 | `"weight": "700"`（字串） | `"weight": 700`（數字）。select 屬性的值型別要跟 types.md 完全一致 |
 | 粒子或生成藝術只寫 `"preset": "moon"` | 把 types.md「預設值清單」該預設的整組屬性照抄進 `props`。編輯器選預設時會一併帶入這些值，runtime 讀 JSON 時不會，漏抄就會用錯顏色或尺寸 |
 | 在 `fx_*`、`tr_*` 寫 `x`、`y`、`scale` | 全畫面特效與轉場沒有位置、縮放與濾鏡屬性，入場／出場只影響透明度 |
