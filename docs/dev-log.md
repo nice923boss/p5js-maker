@@ -246,3 +246,5 @@ repo `nice923boss/p5js-maker`（公開、MIT），Pages 從 `main` 根目錄提�
 | `runtime/assets.js` | `prepare()` 的圖片等待條件改為項目不存在就視為結束 |
 
 驗證（編輯器從原始碼載入，瀏覽器窗格）：舊版 prepare 後立刻 release，1.5 秒內 30 個錯誤；修正版同一操作 0 錯誤，prepare 62 毫秒結束。用 `openFile` 連續開啟 5 個含大圖的專案，4 秒內 0 錯誤，最後停在第 5 個專案。正常路徑：3000×3000 圖片 prepare 結束時已可取得圖片。exe 已重建（9,111,340 bytes），未實際啟動。
+
+發布 Release v1.1.0（tag 指向 e401803），附 `P5JSMaker.exe`（9,111,340 bytes，下載後 SHA-256 與本機一致）與 `stop.bat`。exe 以 38931 連接埠實際啟動：編輯器載入無錯誤，提供的 assets.js、library.js 為新版。v1.0.0 保留不動。
